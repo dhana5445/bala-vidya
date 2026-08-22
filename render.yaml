@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: balavidya-lms
+    env: node
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"

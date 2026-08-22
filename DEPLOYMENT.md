@@ -1,20 +1,59 @@
-# Balavidya Production Path
+# Balavidya Deployment Guide
 
-## Local API
+## 1. Database (Supabase) ✅ Connected
 
-1. Copy `.env.example` to `.env` and set a strong `JWT_SECRET` and PostgreSQL `DATABASE_URL`.
-2. Run `npm install`.
-3. Apply `server/schema.sql` to PostgreSQL.
-4. Run `npm start`.
+Your database is live on Supabase and initialized with all tables, constraints, and test seed data.
 
-The static UI can still be opened directly for the prototype. For authentication, API calls, service-worker caching, and secure cookies, serve it from the same origin over HTTPS.
+- **Supabase Host:** `aws-0-ap-southeast-1.pooler.supabase.com`
+- **Seeded Test Student:** `BV-0824-019` / `password123`
+- **Seeded Test Admin:** `admin` / `admin123`
 
-## What Is Included
+---
 
-- `server/index.js`: Express API with Helmet, CORS, Zod request validation, Argon2 password verification, JWT role claims, student-scoped progress, attempt creation, and protected admin analytics boundary.
-- `server/schema.sql`: schools, users, role model, student profiles, subjects, topics, lessons, questions, attempts, answers, progress, and audit log tables.
-- `manifest.webmanifest` and `service-worker.js`: installable shell and cache-first low-bandwidth behavior.
+## 2. Local Development
 
-## Required Next Integration
+To run the full stack locally:
+```powershell
+# Start local server (serves both API & Frontend on http://localhost:3000)
+node server/index.js
+```
 
-Replace the prototype `localStorage` sign-in with `POST /api/v1/auth/login`, store the short-lived token in an HttpOnly secure cookie, load `/api/v1/me/dashboard` on Home, submit attempts to `/api/v1/attempts`, and load `/api/v1/me/progress` for Progress. Do not put child passwords, tokens, or private performance data in localStorage in production.
+---
+
+## 3. Deploying to Render.com (Free Cloud Hosting)
+
+### Step A: Push Code to GitHub
+1. Create a repository on GitHub (e.g. `balavidya-lms`).
+2. Push your project code:
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial Balavidya release with Supabase backend"
+   git branch -M main
+   git remote add origin https://github.com/<YOUR-GITHUB-USERNAME>/balavidya-lms.git
+   git push -u origin main
+   ```
+
+### Step B: Create a Web Service on Render
+1. Log in to [dashboard.render.com](https://dashboard.render.com).
+2. Click **New +** $\rightarrow$ **Web Service**.
+3. Connect your GitHub account and select your `balavidya-lms` repository.
+4. Configure the service settings:
+   - **Name:** `balavidya-lms`
+   - **Region:** `Singapore (Southeast Asia)` *(closest to your Supabase instance)*
+   - **Branch:** `main`
+   - **Runtime:** `Node`
+   - **Build Command:** `npm install`
+   - **Start Command:** `node server/index.js`
+   - **Instance Type:** `Free`
+
+### Step C: Set Environment Variables on Render
+Under **Environment Variables**, add:
+| Key | Value |
+| :--- | :--- |
+| `DATABASE_URL` | `postgresql://postgres.zdunbzpbrlknetpwkmwl:%24%24Dhanunjaya009@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres` |
+| `JWT_SECRET` | `balavidya_production_secret_key_2026_998127` *(or any 32+ char secret)* |
+| `CORS_ORIGIN` | `*` |
+
+5. Click **Create Web Service**.
+6. Render will build and deploy your app. Within 1–2 minutes, you will receive a live public HTTPS URL (e.g., `https://balavidya-lms.onrender.com`).

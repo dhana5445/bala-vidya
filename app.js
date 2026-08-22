@@ -4,6 +4,31 @@ const feedback = document.getElementById('quizFeedback');
 const authScreen = document.getElementById('authScreen');
 let authMode = 'signin';
 
+const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+
+function getAuthToken() {
+  return localStorage.getItem('balavidya_token');
+}
+
+function setAuthSession(token, user) {
+  localStorage.setItem('balavidya_token', token);
+  localStorage.setItem('balavidya_user', JSON.stringify(user));
+}
+
+function clearAuthSession() {
+  localStorage.removeItem('balavidya_token');
+  localStorage.removeItem('balavidya_user');
+  localStorage.removeItem('balavidyaSignedIn');
+}
+
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem('balavidya_user') || 'null');
+  } catch {
+    return null;
+  }
+}
+
 function setAuthMode(mode) {
   authMode = mode;
   const signup = mode === 'signup';
@@ -20,35 +45,165 @@ function setAuthMode(mode) {
 
 document.getElementById('signInTab').addEventListener('click', () => setAuthMode('signin'));
 document.getElementById('signUpTab').addEventListener('click', () => setAuthMode('signup'));
-document.getElementById('authForm').addEventListener('submit', (event) => {
+
+document.getElementById('authForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  const username = document.getElementById('authUsername').value.trim();
+  const password = document.getElementById('authPassword').value;
+
   if (authMode === 'signup') {
-    const name = document.getElementById('authName').value.trim();
-    const username = document.getElementById('authUsername').value.trim();
-    localStorage.setItem('balavidyaStudent', JSON.stringify({ name, username }));
-    showToast('Account created successfully.');
+    const displayName = document.getElementById('authName').value.trim();
+    const classVal = document.getElementById('authClass').value;
+    const grade = Number(classVal.replace(/\D/g, '') || 8);
+    const section = document.getElementById('authSection').value.trim() || 'A';
+    const schoolName = document.getElementById('authSchool').value.trim() || 'Govt. High School, Vijayawada';
+    const district = document.getElementById('authDistrict').value.trim() || 'NTR District';
+
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, displayName, grade, section, schoolName, district })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to create account');
+
+      setAuthSession(data.token, data.user);
+      localStorage.setItem('balavidyaSignedIn', 'true');
+      showToast(`Welcome, ${data.user.displayName}!`);
+      authScreen.classList.add('hidden');
+      await loadDashboard();
+    } catch (err) {
+      showToast(`Error: ${err.message}`);
+    }
   } else {
-    showToast('Signed in successfully.');
+    try {
+      const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Invalid credentials');
+
+      setAuthSession(data.token, data.user);
+      localStorage.setItem('balavidyaSignedIn', 'true');
+      showToast(`Welcome back, ${data.user.displayName}!`);
+      authScreen.classList.add('hidden');
+      await loadDashboard();
+    } catch (err) {
+      showToast(`Login failed: ${err.message}`);
+    }
   }
-  localStorage.setItem('balavidyaSignedIn', 'true');
-  authScreen.classList.add('hidden');
 });
-if (localStorage.getItem('balavidyaSignedIn') === 'true') authScreen.classList.add('hidden');
+
+// Check if user is already signed in on load
+if (getAuthToken()) {
+  authScreen.classList.add('hidden');
+  loadDashboard();
+}
 
 function showToast(message) {
   toast.textContent = message;
   toast.classList.add('show');
-  window.setTimeout(() => toast.classList.remove('show'), 2600);
+  window.setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-const progressState = JSON.parse(localStorage.getItem('balavidyaProgress') || '{"attempted":0,"correct":0,"tests":0,"lessons":0,"minutes":0}');
+let progressState = JSON.parse(localStorage.getItem('balavidyaProgress') || '{"attempted":0,"correct":0,"tests":0,"lessons":0,"minutes":0}');
 function saveProgress() { localStorage.setItem('balavidyaProgress', JSON.stringify(progressState)); }
-function recordProgress(attempted, correct, minutes = 1) {
+
+async function recordProgress(attempted, correct, minutes = 1) {
   progressState.attempted += attempted;
   progressState.correct += correct;
   progressState.tests += 1;
   progressState.minutes += minutes;
   saveProgress();
+
+  const token = getAuthToken();
+  if (token) {
+    try {
+      await fetch(`${API_BASE}/api/v1/attempts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: 'test',
+          title: activeTestTitle,
+          totalQuestions: activeTestSize,
+          answeredCount: attempted,
+          correctCount: correct,
+          timeSeconds: minutes * 60
+        })
+      });
+      loadDashboard();
+    } catch (err) {
+      console.warn('Could not sync attempt to server:', err);
+    }
+  }
+}
+
+async function loadDashboard() {
+  const token = getAuthToken();
+  if (!token) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/me/dashboard`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.user) return;
+
+    const user = data.user;
+    const stats = data.stats || {};
+
+    // Update greeting
+    const firstName = user.displayName ? user.displayName.split(' ')[0] : 'Student';
+    const welcomeHeader = document.querySelector('.welcome-row h1');
+    if (welcomeHeader) welcomeHeader.innerHTML = `Good morning, ${firstName} <span>✦</span>`;
+
+    // Update Topbar
+    const avatar = document.querySelector('.avatar');
+    const profileName = document.querySelector('.profile-name');
+    if (avatar) avatar.textContent = user.displayName ? user.displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'BV';
+    if (profileName) profileName.textContent = user.displayName || 'Student';
+
+    // Update School Chip
+    const schoolChip = document.querySelector('.school-chip span');
+    if (schoolChip) schoolChip.innerHTML = `${user.school || 'Govt. High School'}<br><b>${user.district || 'Vijayawada'}</b>`;
+
+    // Update Hero Card
+    const heroTitle = document.querySelector('.hero-card h2');
+    if (heroTitle) heroTitle.innerHTML = `Class ${user.grade || 8}<br><span>Foundation track</span>`;
+
+    // Update Stats on Home
+    const progressStat = document.querySelector('.stat-card:nth-child(1) strong');
+    const progressRing = document.querySelector('.stat-card:nth-child(1) .ring');
+    const lessonsStat = document.querySelector('.stat-card:nth-child(2) strong');
+    const quizScoreStat = document.querySelector('.stat-card:nth-child(3) strong');
+    const streakStat = document.querySelector('.stat-card:nth-child(4) strong');
+
+    if (progressStat) progressStat.innerHTML = `${stats.mastery || 0}<small>%</small>`;
+    if (progressRing) {
+      progressRing.style.setProperty('--progress', stats.mastery || 0);
+      const ringText = progressRing.querySelector('span');
+      if (ringText) ringText.textContent = `${stats.mastery || 0}%`;
+    }
+    if (lessonsStat) lessonsStat.innerHTML = `${stats.lessonsCompleted || 0}<small>/ 36</small>`;
+    if (quizScoreStat) quizScoreStat.innerHTML = `${stats.accuracy || 0}<small>%</small>`;
+    if (streakStat) streakStat.innerHTML = `${stats.testsCompleted || 0}<small> tests</small>`;
+
+    // Sync progressState
+    progressState.attempted = stats.questionsAttempted || progressState.attempted;
+    progressState.correct = stats.questionsCorrect || progressState.correct;
+    progressState.tests = stats.testsCompleted || progressState.tests;
+    progressState.minutes = stats.minutesSpent || progressState.minutes;
+    saveProgress();
+  } catch (err) {
+    console.warn('Dashboard fetch error:', err);
+  }
 }
 
 const learnQuizQuestions = {
@@ -62,7 +217,10 @@ function openQuiz(title = 'Fractions', subject = 'maths', customQuestion = null)
   const quiz = customQuestion || learnQuizQuestions[subject] || learnQuizQuestions.maths;
   document.getElementById('modalTitle').textContent = title;
   document.querySelector('.modal-question').innerHTML = quiz.question;
-  document.querySelectorAll('.quiz-options button').forEach((button, index) => { button.textContent = quiz.options[index]; button.dataset.answer = quiz.options[index].startsWith(quiz.answer) ? 'correct' : 'wrong'; });
+  document.querySelectorAll('.quiz-options button').forEach((button, index) => {
+    button.textContent = quiz.options[index];
+    button.dataset.answer = quiz.options[index].startsWith(quiz.answer) ? 'correct' : 'wrong';
+  });
   feedback.textContent = '';
   document.querySelectorAll('.quiz-options button').forEach((button) => {
     button.classList.remove('correct-answer', 'wrong-answer');
@@ -98,13 +256,20 @@ function addChapterNavigator(topicKey) {
 document.getElementById('continueButton').addEventListener('click', () => { showTopicPage('maths'); resetOpenedTopicProgress(); addChapterNavigator('maths'); });
 document.getElementById('practiceButton').addEventListener('click', () => openTest('Daily 15 · IIT Foundation Practice', 15, dailyPracticeQuestions));
 document.getElementById('revisionButton').addEventListener('click', () => showTopicPage('maths'));
+
 function downloadReport() {
+  const stored = getStoredUser();
+  const studentName = stored?.displayName || 'Pardha D';
+  const studentClass = stored ? `Class ${stored.grade || 8} · Section ${stored.section || 'A'}` : 'Class 8 · Section A';
+  const schoolName = stored?.schoolName || 'Govt. High School, Vijayawada';
+  const district = stored?.district || 'NTR District';
+
   const accuracy = progressState.attempted ? Math.round((progressState.correct / progressState.attempted) * 100) : 0;
-  const report = `<!doctype html><html><head><meta charset="UTF-8"><title>Pardha D - Progress Report</title><style>body{font-family:Arial,sans-serif;color:#17212b;max-width:760px;margin:40px auto;padding:0 24px}h1{color:#dc563f}h2{border-bottom:1px solid #e5e8ec;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin:18px 0}td,th{padding:10px;border:1px solid #e5e8ec;text-align:left}th{background:#f7f8fc}.zero{color:#dc563f;font-weight:bold}.meta{color:#66727e}</style></head><body><h1>Balavidya Progress Report</h1><p class="meta">Generated: 20 August 2026</p><h2>Student details</h2><table><tr><th>Name</th><td>Pardha D</td></tr><tr><th>Class</th><td>Class 8 · Section A</td></tr><tr><th>School</th><td>Govt. High School, Vijayawada</td></tr><tr><th>District</th><td>NTR District</td></tr><tr><th>Academic year</th><td>2026–27</td></tr></table><h2>Learning summary</h2><table><tr><th>Overall progress</th><td class="zero">${Math.min(100, progressState.tests ? 5 : 0)}%</td></tr><tr><th>Lessons completed</th><td class="zero">${progressState.lessons} / 36</td></tr><tr><th>Tests completed</th><td class="zero">${progressState.tests}</td></tr><tr><th>Questions attempted</th><td class="zero">${progressState.attempted}</td></tr><tr><th>Quiz accuracy</th><td class="zero">${accuracy}%</td></tr><tr><th>Learning time</th><td class="zero">${progressState.minutes} minutes</td></tr></table><h2>Subjects</h2><p>Mathematics: Foundation path · Physics: Foundation path · Chemistry: Foundation path · Logical Reasoning: Foundation path</p></body></html>`;
+  const report = `<!doctype html><html><head><meta charset="UTF-8"><title>${studentName} - Progress Report</title><style>body{font-family:Arial,sans-serif;color:#17212b;max-width:760px;margin:40px auto;padding:0 24px}h1{color:#dc563f}h2{border-bottom:1px solid #e5e8ec;padding-bottom:8px}table{width:100%;border-collapse:collapse;margin:18px 0}td,th{padding:10px;border:1px solid #e5e8ec;text-align:left}th{background:#f7f8fc}.zero{color:#dc563f;font-weight:bold}.meta{color:#66727e}</style></head><body><h1>Balavidya Progress Report</h1><p class="meta">Generated: 20 August 2026</p><h2>Student details</h2><table><tr><th>Name</th><td>${studentName}</td></tr><tr><th>Class</th><td>${studentClass}</td></tr><tr><th>School</th><td>${schoolName}</td></tr><tr><th>District</th><td>${district}</td></tr><tr><th>Academic year</th><td>2026–27</td></tr></table><h2>Learning summary</h2><table><tr><th>Overall progress</th><td class="zero">${Math.min(100, progressState.tests ? 5 : 0)}%</td></tr><tr><th>Lessons completed</th><td class="zero">${progressState.lessons} / 36</td></tr><tr><th>Tests completed</th><td class="zero">${progressState.tests}</td></tr><tr><th>Questions attempted</th><td class="zero">${progressState.attempted}</td></tr><tr><th>Quiz accuracy</th><td class="zero">${accuracy}%</td></tr><tr><th>Learning time</th><td class="zero">${progressState.minutes} minutes</td></tr></table><h2>Subjects</h2><p>Mathematics: Foundation path · Physics: Foundation path · Chemistry: Foundation path · Logical Reasoning: Foundation path</p></body></html>`;
   const blob = new Blob([report], { type: 'text/html;charset=utf-8' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = 'pardha-d-progress-report.html';
+  link.download = `${studentName.toLowerCase().replace(/\s+/g, '-')}-progress-report.html`;
   link.click();
   URL.revokeObjectURL(link.href);
   showToast('Progress report downloaded.');
@@ -120,6 +285,7 @@ let activeQuestionBank = null;
 let activeTestGrade = 8;
 let testTimerId = null;
 let testSecondsRemaining = 0;
+
 const testQuestionSets = [
   ['A shop gives 20% off a ₹750 bag, then adds 5% tax to the discounted price. What is the final price?', ['₹600', '₹630', '₹637.50', '₹787.50'], 2, 'Maths · Percentage'],
   ['A cyclist increases speed from 4 m/s to 10 m/s in 3 seconds. What is the average acceleration?', ['2 m/s²', '3 m/s²', '6 m/s²', '14 m/s²'], 0, 'Physics · Motion'],
@@ -127,6 +293,7 @@ const testQuestionSets = [
   ['A number is doubled, then 6 is added. The result is 30. What was the original number?', ['10', '12', '15', '18'], 1, 'Reasoning · Algebraic Thinking'],
   ['A rectangle has perimeter 52 cm and length 16 cm. What is its area?', ['160 cm²', '320 cm²', '416 cm²', '832 cm²'], 1, 'Maths · Mensuration']
 ];
+
 const dailyPracticeQuestions = [
   ['If 3/4 of a number is 18, what is the number?', ['12', '18', '24', '27'], 2, 'Maths · Fractions', 2],
   ['A train travels 120 km in 2 hours. What is its average speed?', ['40 km/h', '60 km/h', '80 km/h', '240 km/h'], 1, 'Physics · Motion', 2],
@@ -234,7 +401,7 @@ function finishTest() {
   document.getElementById('testMarks').textContent = `${correct} / ${activeTestSize}`;
   document.getElementById('testAccuracy').textContent = `${Math.round((correct / activeTestSize) * 100)}%`;
   document.getElementById('testCorrect').textContent = correct;
-  document.getElementById('testUnanswered').textContent = 50 - answered;
+  document.getElementById('testUnanswered').textContent = activeTestSize - answered;
 }
 
 document.getElementById('testRunnerClose').addEventListener('click', () => { window.clearInterval(testTimerId); testRunner.hidden = true; });
@@ -244,6 +411,7 @@ document.getElementById('testOptions').addEventListener('click', (event) => { co
 document.getElementById('testRetry').addEventListener('click', () => openTest(activeTestTitle, activeTestSize, activeQuestionBank));
 document.getElementById('testDone').addEventListener('click', () => { window.clearInterval(testTimerId); testRunner.hidden = true; showPage('Tests'); });
 testRunner.addEventListener('click', (event) => { if (event.target === testRunner) testRunner.hidden = true; });
+
 const bookReader = document.getElementById('bookReader');
 const bookPages = {
   maths: {
@@ -301,11 +469,14 @@ const bookPages = {
     ]
   }
 };
+
 const intermediateBook = (title, subject, symbol, cover, chapters) => ({ title, subject, symbol, cover, chapters, text: chapters.map((chapter) => `${chapter} introduces the core idea in simple steps, connects it to real problems, and builds the foundation needed for higher studies and competitive examinations.`), examples: chapters.map((chapter) => `Worked example: identify the key quantities in ${chapter}, choose the correct rule, solve step by step, and check the final answer.`) });
 bookPages.inter1 = intermediateBook('Intermediate 1st Year Foundation Maths', 'INTER 1ST<br>YEAR MATHS', '∑', 'reader-inter1', ['Sets and Functions', 'Mathematical Induction', 'Matrices', 'Quadratic Expressions', 'Permutations', 'Binomial Theorem', 'Coordinate Geometry', 'Limits', 'Differentiation Basics', 'Practice Lab']);
 bookPages.inter2 = intermediateBook('Intermediate 2nd Year Foundation Science', 'INTER 2ND<br>YEAR SCIENCE', '◌', 'reader-inter2', ['Complex Numbers', 'Differential Equations', 'Vectors', 'Electricity', 'Magnetism', 'Waves', 'Organic Chemistry', 'Physical Chemistry', 'Modern Physics', 'Grand Practice']);
+
 let activeBook = bookPages.maths;
 let activeBookPage = 0;
+
 const chapterActivities = {
   maths: [
     ['Simplify 4/8.', 'Fractions can be simplified by dividing the top and bottom by 4.', 'A fraction shows equal parts of a whole.'],
@@ -332,14 +503,17 @@ const chapterActivities = {
     ['What happens when two north poles are brought together?', 'They repel each other.', 'Magnetic poles follow predictable attraction and repulsion rules.']
   ]
 };
+
 const chapterFormulas = {
   maths: ['Fraction of a quantity = fraction × quantity', 'Decimal = fraction with denominator 10, 100 or 1000', 'Ratio = first quantity : second quantity', 'Percentage = (part ÷ whole) × 100', 'x + a = b means x = b − a', 'Perimeter of rectangle = 2 × (length + breadth)', 'Average = sum of values ÷ number of values', 'Probability = favourable outcomes ÷ total outcomes', 'Point = (x, y)', 'Choose the rule, show the steps, check the answer'],
   science: ['Matter has mass and takes up space', 'Speed = distance ÷ time', 'Energy enables movement or change', 'Light travels in straight lines', 'Sound is made by vibrations', 'Heat flows from hotter to cooler objects', 'Living things grow, use energy and respond', 'Current needs a closed circuit', 'Like poles repel; unlike poles attract', 'Observe → question → test → conclude']
 };
+
 chapterActivities.inter1 = bookPages.inter1.chapters.map((chapter) => [`Solve one foundation problem from ${chapter}.`, `Identify the given values, apply the ${chapter} rule, and verify the result.`, `${chapter} becomes easier when each step is written clearly.`]);
 chapterActivities.inter2 = bookPages.inter2.chapters.map((chapter) => [`Explain one key idea from ${chapter}.`, `List the known values, choose the relevant principle, and check the units.`, `${chapter} connects theory to higher-study and entrance-exam problems.`]);
 chapterFormulas.inter1 = chapterFormulas.maths.concat(['Use definitions before applying a theorem']);
 chapterFormulas.inter2 = chapterFormulas.science.concat(['Check units and limiting cases']);
+
 const pageConcepts = {
   maths: ['Meaning and parts', 'Visual models', 'Equivalent forms', 'Comparing values', 'Converting forms', 'Worked method', 'Common mistake check', 'Everyday application', 'Challenge connection', 'Chapter recap'],
   science: ['Observation', 'Key definition', 'Particle model', 'Cause and effect', 'Measurement', 'Worked investigation', 'Common mistake check', 'Everyday application', 'Challenge connection', 'Chapter recap'],
@@ -392,6 +566,7 @@ document.getElementById('bookNext').addEventListener('click', () => {
 });
 document.getElementById('bookQuiz').addEventListener('click', () => openQuiz(`${activeBook.chapters[Math.floor(activeBookPage / 10)]} quiz`));
 bookReader.addEventListener('click', (event) => { if (event.target === bookReader) { bookReader.classList.remove('open'); bookReader.hidden = true; } });
+
 const videoReader = document.getElementById('videoReader');
 document.querySelectorAll('[data-video]').forEach((button) => button.addEventListener('click', () => { videoReader.hidden = false; videoReader.classList.add('open'); }));
 document.getElementById('videoClose').addEventListener('click', () => { videoReader.classList.remove('open'); videoReader.hidden = true; });
@@ -409,10 +584,12 @@ document.querySelectorAll('.quiz-options button').forEach((button) => {
       button.classList.add('correct-answer');
       feedback.innerHTML = '<strong>Correct!</strong> 2/3 is 4/6, and 4/6 + 1/6 = 5/6. Great work.';
       showToast('Quiz complete: 10/10');
+      recordProgress(1, 1, 2);
     } else {
       button.classList.add('wrong-answer');
       document.querySelector('[data-answer="correct"]').classList.add('correct-answer');
       feedback.innerHTML = '<strong>Let us learn together.</strong> The correct answer is B. Try the revision lesson and come back for another attempt.';
+      recordProgress(1, 0, 2);
     }
   });
 });
@@ -420,14 +597,19 @@ document.querySelectorAll('.quiz-options button').forEach((button) => {
 const routedPage = document.getElementById('routedPage');
 const dashboardView = document.getElementById('dashboardView');
 
+function getProfileTemplate() {
+  const user = getStoredUser() || {};
+  return `<div class="route-heading"><div><span class="overline">YOUR ACCOUNT</span><h1>Profile</h1><p>Your student credentials and learning info.</p></div><button class="outline-button page-action" data-action="signout" style="color:#d9534f;border-color:#f5c6cb">Sign out</button></div><div class="profile-layout"><article class="profile-card"><div class="large-avatar">${user.displayName ? user.displayName.slice(0, 2).toUpperCase() : 'PD'}</div><h2>${user.displayName || 'Pardha D'}</h2><p>Student ID · ${user.username || 'BV-0824-019'}</p><span class="profile-class">Class ${user.grade || 8} · Section ${user.section || 'A'}</span></article><article class="profile-form"><label>Student name<input value="${user.displayName || 'Pardha D'}" readonly></label><label>School name<input value="${user.schoolName || user.school || 'Govt. High School, Vijayawada'}" readonly></label><label>District<input value="${user.district || 'NTR District'}" readonly></label><label>Academic year<input value="2026–27" readonly></label><label>Language<select><option>English</option><option>తెలుగు</option></select></label></article></div>`;
+}
+
 const pageTemplates = {
   Learn: '<div class="route-heading"><div><span class="overline">CLASS 8 FOUNDATION TRACK</span><h1>Learn at your pace</h1><p>Short lessons, clear examples and practice that builds confidence.</p></div><button class="primary-button page-action" data-action="continue">Continue learning <span>→</span></button></div><div class="route-tabs"><button class="route-tab active">All subjects</button><button class="route-tab">Maths</button><button class="route-tab">Science</button><button class="route-tab">Reasoning</button></div><div class="route-grid"><article class="route-card"><div class="route-subject math">∑</div><span class="difficulty foundation">IN PROGRESS</span><h2>Fractions & Decimals</h2><p>Learn parts of a whole, compare fractions and solve everyday problems.</p><div class="progress-line"><span style="width:72%"></span></div><small>72% complete · 3 lessons</small><button class="outline-button page-action" data-action="topic">Open lesson</button></article><article class="route-card"><div class="route-subject science">✧</div><span class="difficulty basic">START HERE</span><h2>Force & Motion</h2><p>Explore pushes, pulls, speed and the science behind moving objects.</p><div class="progress-line"><span style="width:44%"></span></div><small>44% complete · 4 lessons</small><button class="outline-button page-action" data-action="lesson">Open lesson</button></article><article class="route-card"><div class="route-subject reasoning">⌁</div><span class="difficulty application">UP NEXT</span><h2>Number Patterns</h2><p>Spot patterns, predict the next number and explain your thinking.</p><div class="progress-line"><span style="width:28%"></span></div><small>28% complete · 2 lessons</small><button class="outline-button page-action" data-action="lesson">Open lesson</button></article></div>',
   Practice: '<div class="route-heading"><div><span class="overline">BUILD YOUR MOMENTUM</span><h1>Practice zone</h1><p>Choose a set that matches your time and your next learning goal.</p></div><div class="streak-callout">✦ <b>0 days</b><small>start your streak</small></div></div><div class="practice-feature"><div><span class="label-pill">READY WHEN YOU ARE</span><h2>Daily 15 questions</h2><p>5 Maths, 5 Science and 5 Reasoning questions selected for Class 8 and your current level.</p><button class="primary-button page-action" data-action="practice">Start today practice <span>→</span></button></div><div class="practice-number">15<small>questions</small></div></div><div class="route-grid three"><article class="route-card compact"><span class="overline">MATHS</span><h2>Fractions practice</h2><p>10 questions · Foundation · 0% complete</p><button class="soft-button page-action" data-action="quiz">Start set <span>→</span></button></article><article class="route-card compact"><span class="overline">SCIENCE</span><h2>Force & Motion</h2><p>8 questions · Level 1 · 0% complete</p><button class="soft-button page-action" data-action="quiz">Start set <span>→</span></button></article><article class="route-card compact"><span class="overline">REASONING</span><h2>Number patterns</h2><p>10 questions · Application · 0% complete</p><button class="soft-button page-action" data-action="quiz">Start set <span>→</span></button></article></div>',
   Quizzes: '<div class="route-heading"><div><span class="overline">CHECK YOUR UNDERSTANDING</span><h1>Quizzes</h1><p>Quick feedback helps you know what to revise next.</p></div><div class="score-summary"><b>0%</b><small>no attempts yet</small></div></div><div class="quiz-list"><article class="quiz-list-row"><div class="route-subject math">∑</div><div><h2>Fractions · Quick quiz</h2><p>10 questions · Not attempted · Foundation</p></div><span class="quiz-status">Ready</span><button class="primary-button page-action" data-action="quiz">Start quiz</button></article><article class="quiz-list-row"><div class="route-subject science">✧</div><div><h2>States of Matter</h2><p>8 questions · Not attempted · Level 1</p></div><span class="quiz-status">Ready</span><button class="primary-button page-action" data-action="quiz">Start quiz</button></article><article class="quiz-list-row"><div class="route-subject reasoning">⌁</div><div><h2>Logical Sequences</h2><p>12 questions · Unlocks after Number Patterns</p></div><span class="quiz-status locked">Locked</span><button class="outline-button" disabled>Complete lesson</button></article></div>',
   Tests: '<div class="route-heading"><div><span class="overline">TEST CENTRE</span><h1>Tests and mock exams</h1><p>Take your time, think clearly and use every test as practice.</p></div></div><div class="test-grid"><article class="test-card featured"><span class="label-pill">THIS WEEK</span><h2>Weekly foundation test</h2><p>20 mixed questions from Maths, Science and Reasoning.</p><div><b>20</b> questions <b>30 min</b> time</div><button class="primary-button page-action" data-action="test">Start test <span>→</span></button></article><article class="test-card"><span class="overline">SUBJECT TEST</span><h2>Maths fundamentals</h2><p>Fractions, decimals and ratio.</p><div>15 questions · 20 min</div><button class="outline-button page-action" data-action="test">View test</button></article><article class="test-card"><span class="overline">MONTHLY</span><h2>August challenge</h2><p>Try your strongest thinking yet.</p><div>40 questions · 60 min</div><button class="outline-button page-action" data-action="test">View test</button></article></div>',
-  Progress: '<div class="route-heading"><div><span class="overline">YOUR GROWTH</span><h1>Progress report</h1><p>Pardha is ready to begin his learning journey.</p></div><button class="outline-button page-action" data-action="report">↓ Download report</button></div><div class="progress-overview"><div class="big-progress"><div class="ring" style="--progress:0"><span>0%</span></div><div><h2>Overall progress</h2><p>No activity recorded yet</p></div></div><div><span class="overline">QUESTIONS ATTEMPTED</span><strong class="metric-number">0</strong></div><div><span class="overline">ACCURACY</span><strong class="metric-number">0%</strong></div><div><span class="overline">LEARNING TIME</span><strong class="metric-number">0m</strong></div></div><div class="route-grid three"><article class="route-card compact"><span class="overline">SCIENCE</span><h2>Not started</h2><div class="progress-line"><span style="width:0%"></span></div><small>0% complete</small></article><article class="route-card compact"><span class="overline">MATHS</span><h2>Not started</h2><div class="progress-line"><span style="width:0%"></span></div><small>0% complete</small></article><article class="route-card compact"><span class="overline">REASONING</span><h2>Not started</h2><div class="progress-line"><span style="width:0%"></span></div><small>0% complete</small></article></div>',
-  Achievements: '<div class="route-heading"><div><span class="overline">CELEBRATE YOUR EFFORT</span><h1>Achievements</h1><p>Achievements will unlock as Pardha completes lessons and quizzes.</p></div><div class="score-summary"><b>0</b><small>achievement points</small></div></div><div class="badge-grid"><article class="badge-card"><div>✦</div><h2>First lesson</h2><p>Complete your first lesson to unlock.</p><span>0 / 1 lesson</span></article><article class="badge-card"><div>✓</div><h2>First quiz</h2><p>Complete your first topic quiz.</p><span>Not started</span></article><article class="badge-card"><div>◈</div><h2>Curious learner</h2><p>Complete 10 lessons to unlock.</p><span>0 / 10 lessons</span></article><article class="badge-card"><div>★</div><h2>Challenge thinker</h2><p>Score 80% in a Level 3 quiz.</p><span>Not started</span></article></div>',
-  Profile: '<div class="route-heading"><div><span class="overline">YOUR ACCOUNT</span><h1>Profile</h1><p>Keep your learning details up to date.</p></div><button class="primary-button page-action" data-action="save">Save changes</button></div><div class="profile-layout"><article class="profile-card"><div class="large-avatar">PD</div><h2>Pardha D</h2><p>Student ID · BV-0824-019</p><span class="profile-class">Class 8 · Section A</span></article><article class="profile-form"><label>Student name<input value="Pardha D"></label><label>School name<input value="Govt. High School, Vijayawada"></label><label>District<input value="NTR District"></label><label>Academic year<input value="2026–27"></label><label>Language<select><option>English</option><option>తెలుగు</option></select></label></article></div>'
+  Progress: '<div class="route-heading"><div><span class="overline">YOUR GROWTH</span><h1>Progress report</h1><p>Ready to begin your learning journey.</p></div><button class="outline-button page-action" data-action="report">↓ Download report</button></div><div class="progress-overview"><div class="big-progress"><div class="ring" style="--progress:0"><span>0%</span></div><div><h2>Overall progress</h2><p>No activity recorded yet</p></div></div><div><span class="overline">QUESTIONS ATTEMPTED</span><strong class="metric-number">0</strong></div><div><span class="overline">ACCURACY</span><strong class="metric-number">0%</strong></div><div><span class="overline">LEARNING TIME</span><strong class="metric-number">0m</strong></div></div><div class="route-grid three"><article class="route-card compact"><span class="overline">SCIENCE</span><h2>Not started</h2><div class="progress-line"><span style="width:0%"></span></div><small>0% complete</small></article><article class="route-card compact"><span class="overline">MATHS</span><h2>Not started</h2><div class="progress-line"><span style="width:0%"></span></div><small>0% complete</small></article><article class="route-card compact"><span class="overline">REASONING</span><h2>Not started</h2><div class="progress-line"><span style="width:0%"></span></div><small>0% complete</small></article></div>',
+  Achievements: '<div class="route-heading"><div><span class="overline">CELEBRATE YOUR EFFORT</span><h1>Achievements</h1><p>Achievements unlock as you complete lessons and quizzes.</p></div><div class="score-summary"><b>0</b><small>achievement points</small></div></div><div class="badge-grid"><article class="badge-card"><div>✦</div><h2>First lesson</h2><p>Complete your first lesson to unlock.</p><span>0 / 1 lesson</span></article><article class="badge-card"><div>✓</div><h2>First quiz</h2><p>Complete your first topic quiz.</p><span>Not started</span></article><article class="badge-card"><div>◈</div><h2>Curious learner</h2><p>Complete 10 lessons to unlock.</p><span>0 / 10 lessons</span></article><article class="badge-card"><div>★</div><h2>Challenge thinker</h2><p>Score 80% in a Level 3 quiz.</p><span>Not started</span></article></div>',
+  Profile: getProfileTemplate()
 };
 
 function showPage(view) {
@@ -436,7 +618,10 @@ function showPage(view) {
   const isHome = view === 'Home';
   dashboardView.hidden = !isHome;
   routedPage.hidden = isHome;
-  if (!isHome) routedPage.innerHTML = pageTemplates[view];
+  if (!isHome) {
+    if (view === 'Profile') routedPage.innerHTML = getProfileTemplate();
+    else routedPage.innerHTML = pageTemplates[view];
+  }
   if (view === 'Learn') routedPage.innerHTML = buildLearningCatalog();
   if (view === 'Quizzes') routedPage.innerHTML = buildQuizCatalog();
   if (view === 'Tests') routedPage.innerHTML = buildTestsCatalog();
@@ -466,8 +651,10 @@ const quizQuestionBank = Array.from({ length: 100 }, (_, index) => {
   const set = questionSets[subject];
   return { number, subject, topic, question: set[0], options: set[1], correct: set[2], difficulty: 1 + (index % 5) };
 });
+
 const gradeLabel = (grade) => grade < 11 ? `Class ${grade}` : grade === 11 ? 'Inter 1st Year' : 'Inter 2nd Year';
 let quizPage = 1;
+
 function buildQuizCatalog() {
   const quizzes = Array.from({ length: 100 }, (_, index) => ({
     number: index + 1,
@@ -501,6 +688,7 @@ const learningCatalog = {
   11: { maths: ['Sets and Functions', 'Algebra', 'Trigonometry', 'Coordinate Geometry', 'Permutations', 'Binomial Theorem', 'Limits', 'Differentiation Basics'], physics: ['Units and Measurements', 'Kinematics', 'Laws of Motion', 'Work Energy Power', 'Rotational Motion', 'Gravitation', 'Thermodynamics', 'Waves'], chemistry: ['Some Basic Concepts', 'Atomic Structure', 'Chemical Bonding', 'States of Matter', 'Thermodynamics', 'Equilibrium', 'Redox Reactions', 'Organic Chemistry Basics'], reasoning: ['Advanced Series', 'Functions and Patterns', 'Data Interpretation', 'Logical Puzzles', 'Critical Thinking', 'Competitive Reasoning', 'Spatial Reasoning', 'Challenge Problems'] },
   12: { maths: ['Relations and Functions', 'Matrices', 'Determinants', 'Continuity', 'Differentiation', 'Integrals', 'Vectors', 'Probability'], physics: ['Electrostatics', 'Current Electricity', 'Magnetism', 'Electromagnetic Induction', 'Alternating Current', 'Optics', 'Modern Physics', 'Semiconductors'], chemistry: ['Solid State', 'Solutions', 'Electrochemistry', 'Chemical Kinetics', 'Surface Chemistry', 'p-Block Elements', 'Coordination Compounds', 'Biomolecules'], reasoning: ['Advanced Logic', 'Complex Series', 'Quantitative Reasoning', 'Assertion Reasoning', 'Data Sufficiency', 'Puzzles', 'Spatial Reasoning', 'Grand Challenge'] }
 };
+
 const subjectMeta = { maths: { label: 'Mathematics', icon: '∑', tone: 'math', description: 'Numbers, algebra, geometry and problem-solving.' }, physics: { label: 'Physics', icon: '◌', tone: 'science', description: 'Understand motion, energy, light and the world around you.' }, chemistry: { label: 'Chemistry', icon: '⚗', tone: 'chemistry', description: 'Explore matter, atoms, reactions and materials.' }, reasoning: { label: 'Logical Reasoning', icon: '⌁', tone: 'reasoning', description: 'Build patterns, puzzles and clear thinking skills.' } };
 let selectedGrade = 8;
 let selectedChapter = 0;
@@ -512,14 +700,6 @@ function buildLearningCatalog() {
     return `<article class="subject-learning-card"><div class="subject-card-top"><div class="route-subject ${meta.tone}">${meta.icon}</div><span class="difficulty ${index === 0 ? 'foundation' : 'basic'}">NOT STARTED</span></div><h2>${meta.label}</h2><p>${meta.description}</p><div class="catalog-topic"><b>${topics[0]}</b><span>0% complete</span></div><div class="progress-line"><span style="width:0%"></span></div><div class="subject-card-actions"><button class="outline-button page-action" data-action="topic" data-topic="${subject}">Explore subject <span>→</span></button><button class="soft-button page-action" data-action="subject-quiz" data-topic="${subject}">Start quiz</button></div><small>${topics.length} chapters · Theory, practice & quiz</small></article>`;
   }).join('');
   return `<div class="route-heading catalog-heading"><div><span class="overline">FOUNDATION LEARNING PATHS</span><h1>Learn at your pace</h1><p>Choose your class and build strong foundations in every subject.</p></div><div class="catalog-summary"><b>5</b><small>classes · 4 subjects</small></div></div><div class="grade-tabs">${gradeTabs}</div><div class="catalog-note"><span>✓</span> Content is matched to Class ${selectedGrade}. Harder levels unlock as your mastery grows.</div><div class="subject-learning-grid">${cards}</div>`;
-}
-
-function showTopicPage() {
-  document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.toggle('active', nav.dataset.view === 'Learn'));
-  document.getElementById('pageTitle').textContent = 'Fractions & Decimals';
-  dashboardView.hidden = true;
-  routedPage.hidden = false;
-  routedPage.innerHTML = `<div class="topic-header"><button class="back-link" id="backToLearn">← Back to Learn</button><div class="topic-heading"><div><span class="overline coral-text">CLASS 8 · MATHEMATICS · NUMBER SYSTEM</span><h1>Fractions & Decimals</h1><p>Build a strong base by seeing parts, wholes and numbers in everyday life.</p></div><div class="topic-mastery"><div class="ring" style="--progress:72"><span>72%</span></div><div><b>Topic mastery</b><small>Keep practising</small></div></div></div></div><div class="learning-cycle"><span class="cycle-done">✓ Learn</span><span class="cycle-done">✓ Understand</span><span class="cycle-current">3 Solve</span><span>4 Test</span><span>5 Analyze</span><span>6 Revise</span></div><div class="topic-layout"><main><section class="topic-section"><div class="section-kicker">01 · LEARN</div><h2>What is a fraction?</h2><p>A fraction shows equal parts of a whole. The <b>numerator</b> tells how many parts we have. The <b>denominator</b> tells how many equal parts make the whole.</p><div class="fraction-visual"><div class="fraction-pieces"><i class="filled"></i><i class="filled"></i><i></i><i></i></div><div><b>2/4 = 1/2</b><small>Two of four equal parts is one half.</small></div></div><div class="topic-columns"><article><h3>Important points</h3><ul><li>Denominator can never be zero.</li><li>Equivalent fractions have the same value.</li><li>Simplify by dividing top and bottom by the same number.</li></ul></article><article class="formula-box"><h3>Formula box</h3><b>Fraction of a quantity =</b><strong>fraction × quantity</strong><small>For 1/4 of 20: 1/4 × 20 = 5</small></article></div><div class="mistake-box"><b>Common mistakes students make</b><p>Do not add denominators when adding fractions. First make the denominators alike, then add the numerators.</p></div></section><section class="topic-section"><div class="section-kicker">02 · UNDERSTAND</div><h2>Solved example</h2><div class="solved-problem"><div><span class="difficulty foundation">LEVEL 2 · FOUNDATION</span><h3>What is 2/3 + 1/6?</h3></div><div class="solution-steps"><p><b>Given:</b> 2/3 and 1/6</p><p><b>Concept used:</b> Equivalent fractions</p><p><b>Step 1:</b> Change 2/3 into sixths: 2/3 = 4/6.</p><p><b>Step 2:</b> Add the numerators: 4/6 + 1/6 = 5/6.</p><p><b>Final answer:</b> <strong>5/6</strong></p></div><div class="why-box"><b>Why this method works</b><span>Sixths are equal-sized parts, so we can combine them fairly.</span></div></div></section><section class="topic-section practice-section"><div class="section-kicker">03 · SOLVE</div><div class="practice-title"><div><h2>Practice ladder</h2><p>Difficulty increases when your answers show you are ready.</p></div><span class="practice-score">1 / 5 solved</span></div><div class="difficulty-ladder"><button class="level active" data-level="1"><b>1</b><span>Basic</span></button><button class="level" data-level="2"><b>2</b><span>Foundation</span></button><button class="level" data-level="3"><b>3</b><span>Application</span></button><button class="level locked" data-level="4"><b>4</b><span>IIT Foundation</span></button><button class="level locked" data-level="5"><b>5</b><span>Challenge</span></button></div><div class="practice-question"><span class="difficulty basic">LEVEL 1 · BASIC</span><h3>Which fraction is equal to 1/2?</h3><div class="practice-options"><button data-practice-answer="wrong">A. 2/3</button><button data-practice-answer="correct">B. 3/6</button><button data-practice-answer="wrong">C. 2/5</button><button data-practice-answer="wrong">D. 4/10</button></div><div class="hint-row"><button id="hintButton">▢ Show Hint 1</button><span id="hintText"></span></div><div class="practice-feedback" id="practiceFeedback"></div></div></section></main><aside class="topic-sidebar"><section class="topic-section"><div class="section-kicker">04 · TEST</div><h2>Topic quiz</h2><p>10 questions · 8 minutes</p><button class="primary-button topic-action" data-action="quiz">Start quiz <span>→</span></button></section><section class="topic-section analysis-card"><div class="section-kicker">05 · ANALYZE</div><h2>Your learning signals</h2><div class="signal"><span>Concept understanding</span><b>82%</b><div class="progress-line"><span style="width:82%"></span></div></div><div class="signal"><span>Accuracy</span><b>68%</b><div class="progress-line"><span style="width:68%"></span></div></div><div class="signal"><span>Speed</span><b>Good</b><div class="progress-line"><span style="width:74%"></span></div></div><div class="recommendation-mini"><b>Recommended next step</b><p>Revise equivalent fractions, then attempt Practice Set 2.</p></div></section><section class="topic-section revision-card"><div class="section-kicker">06 · REVISE</div><h2>Revision summary</h2><p>Fractions describe equal parts. Make denominators alike before adding or subtracting.</p><button class="soft-button topic-action" data-action="revision">Open revision <span>→</span></button></section></aside></div>`;
 }
 
 function showTopicPage(topicKey = 'maths', chapterIndex = 0) {
@@ -541,6 +721,7 @@ function showTopicPage(topicKey = 'maths', chapterIndex = 0) {
 }
 
 document.querySelectorAll('.nav-item').forEach((item) => item.addEventListener('click', () => showPage(item.dataset.view)));
+
 routedPage.addEventListener('click', (event) => {
   const quizPageButton = event.target.closest('[data-quiz-page]');
   if (quizPageButton) {
@@ -560,6 +741,12 @@ routedPage.addEventListener('click', (event) => {
   if (action === 'test') openTest(event.target.closest('.page-action').dataset.test || 'Your test');
   if (action === 'report') downloadReport();
   if (action === 'save') showToast('Profile details saved.');
+  if (action === 'signout') {
+    clearAuthSession();
+    showToast('Signed out.');
+    authScreen.classList.remove('hidden');
+    showPage('Home');
+  }
   if (action === 'revision') showToast('Revision lesson opened: equivalent fractions.');
 });
 
@@ -601,10 +788,12 @@ routedPage.addEventListener('click', (event) => {
     if (practiceAnswer.dataset.practiceAnswer === 'correct') {
       practiceAnswer.classList.add('practice-correct');
       result.innerHTML = '<strong>Correct.</strong> 3/6 simplifies to 1/2. Level 2 Foundation is now unlocked.';
+      recordProgress(1, 1, 2);
     } else {
       practiceAnswer.classList.add('practice-wrong');
       document.querySelector('[data-practice-answer="correct"]').classList.add('practice-correct');
       result.innerHTML = '<strong>Let us learn together.</strong> Divide the numerator and denominator of 3/6 by 3.';
+      recordProgress(1, 0, 2);
     }
   }
 });
