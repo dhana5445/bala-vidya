@@ -1,0 +1,10 @@
+{
+  "name": "Balavidya IIT Foundation Academy",
+  "short_name": "Balavidya",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7f8fc",
+  "theme_color": "#26364b",
+  "description": "Low-data foundation learning for Classes 6-10 and Intermediate students.",
+  "icons": []
+}

@@ -1,0 +1,16 @@
+.theme-overrides{}:root{--ink:#17243b;--muted:#5f718b;--line:#d7e1ee;--paper:#eef5ff;--white:#ffffff;--coral:#155eef;--coral-dark:#0b43b5;--lime:#ffc83d;--navy:#102a56;--green:#159a72}
+body{background:var(--paper);color:var(--ink)}
+.sidebar,.topbar,.panel,.stat-card,.route-card,.test-card,.quiz-list-row,.resource-card,.auth-card,.modal,.book-reader,.video-reader,.test-runner,.profile-card,.profile-form,.progress-overview,.quiz-bank-summary>div,.grade-tab,.chapter-choice{background:var(--white)}
+.brand-mark,.primary-button{background:var(--coral)}
+.brand-mark span{color:var(--lime)}
+.nav-item:hover,.nav-item.active{background:#e1ecff;color:var(--coral)}
+.test-count-badge,.quiz-filter.active,.chapter-choice.active{background:#e1ecff;border-color:#9bbcf5;color:var(--coral-dark)}
+.recommendation{background:#fff6dc}
+.daily-card{background:#ffd447}
+.hero-card,.practice-feature,.grand-test-card{background:var(--navy)}
+.progress-line span,.daily-progress span,.reader-progress span,.test-runner-progress span{background:var(--coral)}
+.ring{background:conic-gradient(var(--coral) calc(var(--progress)*1%),#eadde2 0)}
+.soft-button,.outline-button{border-color:#d9a9b8}
+.score-badge{background:#ffe3a3;color:#0b43b5}
+.test-timer{display:grid;gap:3px;text-align:right}.test-timer strong{font:600 18px 'Space Grotesk';color:var(--coral)}.test-timer strong.urgent{color:#c44343;animation:pulse-timer 1s infinite}@keyframes pulse-timer{50%{opacity:.55}}
+.reader-copy h4{font:600 12px 'Space Grotesk';color:var(--coral);margin:8px 0 12px}

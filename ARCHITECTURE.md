@@ -70,7 +70,9 @@ Recommended server controls: Argon2id password hashing, short-lived access token
 
 Every published topic is keyed by `grade`, `subject`, `chapter` and `topic`, and follows this sequence:
 
-`Concepts -> Theory -> Important points -> Formula/rule box -> Visual explanation -> Solved examples -> Level 1-5 practice -> Topic quiz -> Chapter test -> Performance analysis -> Revision summary`
+`Concepts -> Theory -> Important points -> Formula/rule box -> Visual explanation -> Solved examples -> Level 1-7 practice -> Topic quiz -> Chapter test -> Performance analysis -> Revision summary`
+
+Practice levels are: Level 1 Basic, Level 2 Foundation, Level 3 Application, Level 4 IIT Foundation, Level 5 Challenge, Level 6 JEE Main, and Level 7 JEE Advanced. A topic can also be viewed in Foundation, Board Exam, JEE Main, JEE Advanced, or Olympiad preparation mode. Content difficulty remains grade-gated: Classes 6-7 emphasize fundamentals, Classes 8-10 build pre-JEE thinking, and Intermediate 1st/2nd Year provide higher-study and entrance-exam preparation.
 
 The student content API should return the same shape for every class and subject so the UI can render a consistent learning cycle:
 
