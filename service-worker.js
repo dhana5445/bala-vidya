@@ -1,15 +1,17 @@
-const CACHE = 'balavidya-shell-v2';
+const CACHE = 'balavidya-shell-v3';
 const SHELL = ['./', './index.html', './styles.css', './resources.css', './app.js', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(SHELL))
+  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)))
+      Promise.all(keys.map((key) => caches.delete(key)))
     ).then(() => self.clients.claim())
   );
 });
@@ -17,7 +19,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Never return index.html for API requests
+  // Never intercept API endpoints with HTML
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(event.request).catch(() =>
@@ -30,26 +32,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets & navigation
+  // Network-First for HTML/JS/CSS to ensure users get latest fixes immediately
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request)
-          .then((response) => {
-            if (response.ok && event.request.method === 'GET') {
-              const copy = response.clone();
-              caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-            }
-            return response;
-          })
-          .catch(() => {
-            if (event.request.mode === 'navigate') {
-              return caches.match('./index.html');
-            }
-            return cached || caches.match('./index.html');
-          })
-      );
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok && event.request.method === 'GET') {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+        });
+      })
   );
 });
+
