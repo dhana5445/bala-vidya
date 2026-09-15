@@ -32,78 +32,112 @@ function getStoredUser() {
 function setAuthMode(mode) {
   authMode = mode;
   const signup = mode === 'signup';
-  document.getElementById('signInTab').classList.toggle('active', !signup);
-  document.getElementById('signUpTab').classList.toggle('active', signup);
-  document.getElementById('authTitle').textContent = signup ? 'Start your journey' : 'Welcome back';
-  document.getElementById('authSubtitle').textContent = signup ? 'Create your student account and begin learning.' : 'Sign in to continue your foundation journey.';
-  document.getElementById('signupFields').classList.toggle('visible', signup);
-  document.getElementById('authSubmit').innerHTML = signup ? 'Create account <span>→</span>' : 'Sign in <span>→</span>';
-  document.getElementById('authName').required = signup;
-  document.getElementById('authSchool').required = signup;
-  document.getElementById('authDistrict').required = signup;
+  const signInTab = document.getElementById('signInTab');
+  const signUpTab = document.getElementById('signUpTab');
+  const authTitle = document.getElementById('authTitle');
+  const authSubtitle = document.getElementById('authSubtitle');
+  const signupFields = document.getElementById('signupFields');
+  const authSubmit = document.getElementById('authSubmit');
+  const authName = document.getElementById('authName');
+  const authSchool = document.getElementById('authSchool');
+  const authDistrict = document.getElementById('authDistrict');
+
+  if (signInTab) signInTab.classList.toggle('active', !signup);
+  if (signUpTab) signUpTab.classList.toggle('active', signup);
+  if (authTitle) authTitle.textContent = signup ? 'Start your journey' : 'Welcome back';
+  if (authSubtitle) authSubtitle.textContent = signup ? 'Create your student account and begin learning.' : 'Sign in to continue your foundation journey.';
+  if (signupFields) signupFields.classList.toggle('visible', signup);
+  if (authSubmit) authSubmit.innerHTML = signup ? 'Create account <span>→</span>' : 'Sign in <span>→</span>';
+  if (authName) authName.required = signup;
+  if (authSchool) authSchool.required = signup;
+  if (authDistrict) authDistrict.required = signup;
+
+  // Ensure card scrolls to top on tab switch
+  const card = document.querySelector('.auth-card');
+  if (card) card.scrollTop = 0;
 }
 
-document.getElementById('signInTab').addEventListener('click', () => setAuthMode('signin'));
-document.getElementById('signUpTab').addEventListener('click', () => setAuthMode('signup'));
+const signInTabEl = document.getElementById('signInTab');
+if (signInTabEl) signInTabEl.addEventListener('click', () => setAuthMode('signin'));
 
-document.getElementById('authForm').addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const username = document.getElementById('authUsername').value.trim();
-  const password = document.getElementById('authPassword').value;
+const signUpTabEl = document.getElementById('signUpTab');
+if (signUpTabEl) signUpTabEl.addEventListener('click', () => setAuthMode('signup'));
 
-  if (authMode === 'signup') {
-    const displayName = document.getElementById('authName').value.trim();
-    const classVal = document.getElementById('authClass').value;
-    const grade = Number(classVal.replace(/\D/g, '') || 8);
-    const section = document.getElementById('authSection').value.trim() || 'A';
-    const schoolName = document.getElementById('authSchool').value.trim() || 'Govt. High School, Vijayawada';
-    const district = document.getElementById('authDistrict').value.trim() || 'NTR District';
+const authFormEl = document.getElementById('authForm');
+if (authFormEl) {
+  authFormEl.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const usernameInput = document.getElementById('authUsername');
+    const passwordInput = document.getElementById('authPassword');
+    const username = usernameInput ? usernameInput.value.trim() : '';
+    const password = passwordInput ? passwordInput.value : '';
 
-    try {
-      const response = await fetch(`${API_BASE}/api/v1/auth/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, displayName, grade, section, schoolName, district })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to create account');
-
-      setAuthSession(data.token, data.user);
-      localStorage.setItem('balavidyaSignedIn', 'true');
-      showToast(`Welcome, ${data.user.displayName}!`);
-      authScreen.classList.add('hidden');
-      await loadDashboard();
-    } catch (err) {
-      showToast(`Error: ${err.message}`);
+    if (!username || !password) {
+      showToast('Please enter both username and password.');
+      return;
     }
-  } else {
-    try {
-      const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Invalid credentials');
 
-      setAuthSession(data.token, data.user);
-      localStorage.setItem('balavidyaSignedIn', 'true');
-      showToast(`Welcome back, ${data.user.displayName}!`);
-      authScreen.classList.add('hidden');
-      await loadDashboard();
-    } catch (err) {
-      showToast(`Login failed: ${err.message}`);
+    if (authMode === 'signup') {
+      const nameInput = document.getElementById('authName');
+      const classInput = document.getElementById('authClass');
+      const sectionInput = document.getElementById('authSection');
+      const schoolInput = document.getElementById('authSchool');
+      const districtInput = document.getElementById('authDistrict');
+
+      const displayName = nameInput ? nameInput.value.trim() : '';
+      const classVal = classInput ? classInput.value : 'Class 8';
+      const grade = Number(classVal.replace(/\D/g, '') || 8);
+      const section = sectionInput && sectionInput.value.trim() ? sectionInput.value.trim() : 'A';
+      const schoolName = schoolInput && schoolInput.value.trim() ? schoolInput.value.trim() : 'Govt. High School, Vijayawada';
+      const district = districtInput && districtInput.value.trim() ? districtInput.value.trim() : 'NTR District';
+
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/auth/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password, displayName, grade, section, schoolName, district })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to create account');
+
+        setAuthSession(data.token, data.user);
+        localStorage.setItem('balavidyaSignedIn', 'true');
+        showToast(`Welcome, ${data.user.displayName}!`);
+        if (authScreen) authScreen.classList.add('hidden');
+        await loadDashboard();
+      } catch (err) {
+        showToast(`Error: ${err.message}`);
+      }
+    } else {
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Invalid credentials');
+
+        setAuthSession(data.token, data.user);
+        localStorage.setItem('balavidyaSignedIn', 'true');
+        showToast(`Welcome back, ${data.user.displayName}!`);
+        if (authScreen) authScreen.classList.add('hidden');
+        await loadDashboard();
+      } catch (err) {
+        showToast(`Login failed: ${err.message}`);
+      }
     }
-  }
-});
+  });
+}
 
 // Check if user is already signed in on load
-if (getAuthToken()) {
+if (getAuthToken() && authScreen) {
   authScreen.classList.add('hidden');
   loadDashboard();
 }
 
 function showToast(message) {
+  if (!toast) return;
   toast.textContent = message;
   toast.classList.add('show');
   window.setTimeout(() => toast.classList.remove('show'), 3000);
@@ -154,7 +188,7 @@ async function loadDashboard() {
     });
     if (!res.ok) return;
     const data = await res.json();
-    if (!data.user) return;
+    if (!data || !data.user) return;
 
     const user = data.user;
     const stats = data.stats || {};
@@ -215,21 +249,28 @@ const learnQuizQuestions = {
 
 function openQuiz(title = 'Fractions', subject = 'maths', customQuestion = null) {
   const quiz = customQuestion || learnQuizQuestions[subject] || learnQuizQuestions.maths;
-  document.getElementById('modalTitle').textContent = title;
-  document.querySelector('.modal-question').innerHTML = quiz.question;
+  const modalTitle = document.getElementById('modalTitle');
+  const modalQuestion = document.querySelector('.modal-question');
+  if (modalTitle) modalTitle.textContent = title;
+  if (modalQuestion) modalQuestion.innerHTML = quiz.question;
   document.querySelectorAll('.quiz-options button').forEach((button, index) => {
-    button.textContent = quiz.options[index];
-    button.dataset.answer = quiz.options[index].startsWith(quiz.answer) ? 'correct' : 'wrong';
+    button.textContent = quiz.options[index] || '';
+    button.dataset.answer = quiz.options[index]?.startsWith(quiz.answer) ? 'correct' : 'wrong';
   });
-  feedback.textContent = '';
+  if (feedback) feedback.textContent = '';
   document.querySelectorAll('.quiz-options button').forEach((button) => {
     button.classList.remove('correct-answer', 'wrong-answer');
     button.disabled = false;
   });
-  modal.classList.add('open');
+  if (modal) {
+    modal.classList.add('open');
+    const modalInner = modal.querySelector('.modal');
+    if (modalInner) modalInner.scrollTop = 0;
+  }
 }
 
 function resetOpenedTopicProgress() {
+  if (!routedPage) return;
   routedPage.querySelectorAll('.level.locked').forEach((level) => level.classList.remove('locked'));
   const masteryRing = routedPage.querySelector('.topic-mastery .ring');
   const masteryText = routedPage.querySelector('.topic-mastery .ring span');
@@ -240,22 +281,31 @@ function resetOpenedTopicProgress() {
 }
 
 function addChapterNavigator(topicKey) {
-  const chapters = learningCatalog[selectedGrade][topicKey];
+  if (!routedPage) return;
+  const chapters = learningCatalog[selectedGrade]?.[topicKey] || [];
   const prepModes = document.createElement('section');
   prepModes.className = 'prep-modes';
   prepModes.innerHTML = '<span class="overline coral-text">PREPARATION MODE</span><button class="prep-mode active" data-prep="foundation">Foundation</button><button class="prep-mode" data-prep="board">Board exam</button><button class="prep-mode" data-prep="main">JEE Main</button><button class="prep-mode" data-prep="advanced">JEE Advanced</button><button class="prep-mode" data-prep="olympiad">Olympiad</button>';
-  routedPage.querySelector('.topic-layout').before(prepModes);
+  const topicLayout = routedPage.querySelector('.topic-layout');
+  if (topicLayout) topicLayout.before(prepModes);
+
   const navigator = document.createElement('section');
   navigator.className = 'chapter-navigator';
   navigator.innerHTML = `<div><span class="overline coral-text">CHAPTERS IN THIS SUBJECT</span><h2>Choose a chapter</h2><p class="chapter-page-note">Every chapter has at least 10 theory pages, solved examples, practice and a 10-question quiz.</p></div><div class="chapter-navigator-list">${chapters.map((chapter, index) => `<button class="chapter-choice ${index === selectedChapter ? 'active' : ''}" data-topic="${topicKey}" data-chapter="${index}"><b>${index + 1}</b><span>${chapter}<small>10+ pages · quiz</small></span></button>`).join('')}</div>`;
-  routedPage.querySelector('.topic-layout').before(navigator);
+  if (topicLayout) topicLayout.before(navigator);
+
   const ladder = routedPage.querySelector('.difficulty-ladder');
   if (ladder) ladder.insertAdjacentHTML('beforeend', '<button class="level" data-level="6"><b>6</b><span>JEE Main</span></button><button class="level" data-level="7"><b>7</b><span>JEE Advanced</span></button>');
 }
 
-document.getElementById('continueButton').addEventListener('click', () => { showTopicPage('maths'); resetOpenedTopicProgress(); addChapterNavigator('maths'); });
-document.getElementById('practiceButton').addEventListener('click', () => openTest('Daily 15 · IIT Foundation Practice', 15, dailyPracticeQuestions));
-document.getElementById('revisionButton').addEventListener('click', () => showTopicPage('maths'));
+const continueBtn = document.getElementById('continueButton');
+if (continueBtn) continueBtn.addEventListener('click', () => { showTopicPage('maths'); resetOpenedTopicProgress(); addChapterNavigator('maths'); });
+
+const practiceBtn = document.getElementById('practiceButton');
+if (practiceBtn) practiceBtn.addEventListener('click', () => openTest('Daily 15 · IIT Foundation Practice', 15, dailyPracticeQuestions));
+
+const revisionBtn = document.getElementById('revisionButton');
+if (revisionBtn) revisionBtn.addEventListener('click', () => showTopicPage('maths'));
 
 function downloadReport() {
   const stored = getStoredUser();
@@ -275,7 +325,9 @@ function downloadReport() {
   showToast('Progress report downloaded.');
 }
 
-document.getElementById('reportButton').addEventListener('click', downloadReport);
+const reportBtn = document.getElementById('reportButton');
+if (reportBtn) reportBtn.addEventListener('click', downloadReport);
+
 const testRunner = document.getElementById('testRunner');
 let activeTestTitle = 'Class 8 Foundation Test';
 let activeTestQuestion = 0;
@@ -343,13 +395,21 @@ function getTestQuestion(index) {
 
 function renderTestQuestion() {
   const item = getTestQuestion(activeTestQuestion);
-  document.getElementById('testQuestionNumber').textContent = activeTestQuestion + 1;
-  document.getElementById('testRunnerProgress').style.width = `${((activeTestQuestion + 1) / activeTestSize) * 100}%`;
-  document.getElementById('testDifficulty').textContent = `LEVEL ${item.difficulty} · ${item.topic.toUpperCase()}`;
-  document.getElementById('testQuestion').textContent = item.question;
-  document.getElementById('testOptions').innerHTML = item.options.map((option, index) => `<button class="test-option ${testAnswers[activeTestQuestion] === index ? 'selected' : ''}" data-test-option="${index}">${String.fromCharCode(65 + index)}. ${option}</button>`).join('');
-  document.getElementById('testPrevious').disabled = activeTestQuestion === 0;
-  document.getElementById('testNext').innerHTML = activeTestQuestion === activeTestSize - 1 ? 'Finish test <span>✓</span>' : 'Next question <span>→</span>';
+  const qNum = document.getElementById('testQuestionNumber');
+  const qProg = document.getElementById('testRunnerProgress');
+  const qDiff = document.getElementById('testDifficulty');
+  const qText = document.getElementById('testQuestion');
+  const qOpts = document.getElementById('testOptions');
+  const qPrev = document.getElementById('testPrevious');
+  const qNext = document.getElementById('testNext');
+
+  if (qNum) qNum.textContent = activeTestQuestion + 1;
+  if (qProg) qProg.style.width = `${((activeTestQuestion + 1) / activeTestSize) * 100}%`;
+  if (qDiff) qDiff.textContent = `LEVEL ${item.difficulty} · ${item.topic.toUpperCase()}`;
+  if (qText) qText.textContent = item.question;
+  if (qOpts) qOpts.innerHTML = item.options.map((option, index) => `<button class="test-option ${testAnswers[activeTestQuestion] === index ? 'selected' : ''}" data-test-option="${index}">${String.fromCharCode(65 + index)}. ${option}</button>`).join('');
+  if (qPrev) qPrev.disabled = activeTestQuestion === 0;
+  if (qNext) qNext.innerHTML = activeTestQuestion === activeTestSize - 1 ? 'Finish test <span>✓</span>' : 'Next question <span>→</span>';
 }
 
 function openTest(title, questionCount = 50, questionBank = null) {
@@ -359,7 +419,9 @@ function openTest(title, questionCount = 50, questionBank = null) {
   activeTestGrade = title.includes('Inter 1st') ? 11 : title.includes('Inter 2nd') ? 12 : Number(title.match(/Class (\d+)/)?.[1] || 8);
   testSecondsRemaining = questionCount >= 50 ? 40 * 60 : 15 * 60;
   window.clearInterval(testTimerId);
-  document.querySelector('.test-timer').innerHTML = `<span>Question <b id="testQuestionNumber">1</b> / ${activeTestSize}</span><strong id="testCountdown">${formatTestTime()}</strong>`;
+
+  const timerContainer = document.querySelector('.test-timer');
+  if (timerContainer) timerContainer.innerHTML = `<span>Question <b id="testQuestionNumber">1</b> / ${activeTestSize}</span><strong id="testCountdown">${formatTestTime()}</strong>`;
   testTimerId = window.setInterval(() => {
     testSecondsRemaining -= 1;
     updateTestTimer();
@@ -367,14 +429,28 @@ function openTest(title, questionCount = 50, questionBank = null) {
   }, 1000);
   activeTestQuestion = 0;
   testAnswers = Array(activeTestSize).fill(null);
-  document.getElementById('testRunnerTitle').textContent = activeTestTitle;
-  document.querySelector('.test-runner-top .overline').textContent = `${activeTestSize} QUESTION QUIZ · 4 OPTIONS EACH`;
-  document.getElementById('testMarks').textContent = `0 / ${activeTestSize}`;
-  document.getElementById('testUnanswered').textContent = activeTestSize;
-  document.getElementById('testQuestionView').hidden = false;
-  document.getElementById('testResultView').hidden = true;
+
+  const testTitleEl = document.getElementById('testRunnerTitle');
+  const testOverline = document.querySelector('.test-runner-top .overline');
+  const testMarksEl = document.getElementById('testMarks');
+  const testUnansEl = document.getElementById('testUnanswered');
+  const qView = document.getElementById('testQuestionView');
+  const rView = document.getElementById('testResultView');
+
+  if (testTitleEl) testTitleEl.textContent = activeTestTitle;
+  if (testOverline) testOverline.textContent = `${activeTestSize} QUESTION QUIZ · 4 OPTIONS EACH`;
+  if (testMarksEl) testMarksEl.textContent = `0 / ${activeTestSize}`;
+  if (testUnansEl) testUnansEl.textContent = activeTestSize;
+  if (qView) qView.hidden = false;
+  if (rView) rView.hidden = true;
+
   renderTestQuestion();
-  testRunner.hidden = false;
+  if (testRunner) {
+    testRunner.hidden = false;
+    testRunner.classList.add('open');
+    const runnerEl = testRunner.querySelector('.test-runner');
+    if (runnerEl) runnerEl.scrollTop = 0;
+  }
 }
 
 function formatTestTime() {
@@ -395,22 +471,59 @@ function finishTest() {
   const correct = testAnswers.reduce((total, answer, index) => total + (answer === getTestQuestion(index).correct ? 1 : 0), 0);
   const answered = testAnswers.filter((answer) => answer !== null).length;
   recordProgress(answered, correct, Math.max(1, Math.round(activeTestSize / 2)));
-  document.getElementById('testQuestionView').hidden = true;
-  document.getElementById('testResultView').hidden = false;
-  document.getElementById('testResultTitle').textContent = `${activeTestTitle} results`;
-  document.getElementById('testMarks').textContent = `${correct} / ${activeTestSize}`;
-  document.getElementById('testAccuracy').textContent = `${Math.round((correct / activeTestSize) * 100)}%`;
-  document.getElementById('testCorrect').textContent = correct;
-  document.getElementById('testUnanswered').textContent = activeTestSize - answered;
+
+  const qView = document.getElementById('testQuestionView');
+  const rView = document.getElementById('testResultView');
+  const rTitle = document.getElementById('testResultTitle');
+  const rMarks = document.getElementById('testMarks');
+  const rAcc = document.getElementById('testAccuracy');
+  const rCorr = document.getElementById('testCorrect');
+  const rUnans = document.getElementById('testUnanswered');
+
+  if (qView) qView.hidden = true;
+  if (rView) rView.hidden = false;
+  if (rTitle) rTitle.textContent = `${activeTestTitle} results`;
+  if (rMarks) rMarks.textContent = `${correct} / ${activeTestSize}`;
+  if (rAcc) rAcc.textContent = `${Math.round((correct / activeTestSize) * 100)}%`;
+  if (rCorr) rCorr.textContent = correct;
+  if (rUnans) rUnans.textContent = activeTestSize - answered;
 }
 
-document.getElementById('testRunnerClose').addEventListener('click', () => { window.clearInterval(testTimerId); testRunner.hidden = true; });
-document.getElementById('testPrevious').addEventListener('click', () => { if (activeTestQuestion > 0) { activeTestQuestion -= 1; renderTestQuestion(); } });
-document.getElementById('testNext').addEventListener('click', () => { if (activeTestQuestion === activeTestSize - 1) finishTest(); else { activeTestQuestion += 1; renderTestQuestion(); } });
-document.getElementById('testOptions').addEventListener('click', (event) => { const option = event.target.closest('[data-test-option]'); if (option) { testAnswers[activeTestQuestion] = Number(option.dataset.testOption); renderTestQuestion(); } });
-document.getElementById('testRetry').addEventListener('click', () => openTest(activeTestTitle, activeTestSize, activeQuestionBank));
-document.getElementById('testDone').addEventListener('click', () => { window.clearInterval(testTimerId); testRunner.hidden = true; showPage('Tests'); });
-testRunner.addEventListener('click', (event) => { if (event.target === testRunner) testRunner.hidden = true; });
+const testCloseBtn = document.getElementById('testRunnerClose');
+if (testCloseBtn) testCloseBtn.addEventListener('click', () => { window.clearInterval(testTimerId); if (testRunner) { testRunner.classList.remove('open'); testRunner.hidden = true; } });
+
+const testPrevBtn = document.getElementById('testPrevious');
+if (testPrevBtn) testPrevBtn.addEventListener('click', () => { if (activeTestQuestion > 0) { activeTestQuestion -= 1; renderTestQuestion(); } });
+
+const testNextBtn = document.getElementById('testNext');
+if (testNextBtn) testNextBtn.addEventListener('click', () => { if (activeTestQuestion === activeTestSize - 1) finishTest(); else { activeTestQuestion += 1; renderTestQuestion(); } });
+
+const testOptsContainer = document.getElementById('testOptions');
+if (testOptsContainer) {
+  testOptsContainer.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-test-option]');
+    if (option) {
+      testAnswers[activeTestQuestion] = Number(option.dataset.testOption);
+      renderTestQuestion();
+    }
+  });
+}
+
+const testRetryBtn = document.getElementById('testRetry');
+if (testRetryBtn) testRetryBtn.addEventListener('click', () => openTest(activeTestTitle, activeTestSize, activeQuestionBank));
+
+const testDoneBtn = document.getElementById('testDone');
+if (testDoneBtn) testDoneBtn.addEventListener('click', () => { window.clearInterval(testTimerId); if (testRunner) { testRunner.classList.remove('open'); testRunner.hidden = true; } showPage('Tests'); });
+
+if (testRunner) {
+  testRunner.addEventListener('click', (event) => {
+    if (event.target === testRunner) {
+      window.clearInterval(testTimerId);
+      testRunner.classList.remove('open');
+      testRunner.hidden = true;
+    }
+  });
+}
 
 const bookReader = document.getElementById('bookReader');
 const bookPages = {
@@ -524,71 +637,146 @@ const pageConcepts = {
 function renderBookPage() {
   const chapterIndex = Math.floor(activeBookPage / 10);
   const pageInChapter = (activeBookPage % 10) + 1;
-  document.getElementById('bookTitle').textContent = activeBook.title;
-  document.getElementById('bookSubject').innerHTML = activeBook.subject;
-  document.getElementById('bookSymbol').textContent = activeBook.symbol;
-  document.getElementById('readerCover').className = `reader-cover ${activeBook.cover}`;
-  document.getElementById('bookPage').textContent = activeBookPage + 1;
-  document.getElementById('bookChapter').textContent = `${activeBook.chapters[chapterIndex]} · Page ${pageInChapter} of 10`;
+  const bTitle = document.getElementById('bookTitle');
+  const bSubject = document.getElementById('bookSubject');
+  const bSymbol = document.getElementById('bookSymbol');
+  const rCover = document.getElementById('readerCover');
+  const bPage = document.getElementById('bookPage');
+  const bChapter = document.getElementById('bookChapter');
+
+  if (bTitle) bTitle.textContent = activeBook.title;
+  if (bSubject) bSubject.innerHTML = activeBook.subject;
+  if (bSymbol) bSymbol.textContent = activeBook.symbol;
+  if (rCover) rCover.className = `reader-cover ${activeBook.cover}`;
+  if (bPage) bPage.textContent = activeBookPage + 1;
+  if (bChapter) bChapter.textContent = `${activeBook.chapters[chapterIndex]} · Page ${pageInChapter} of 10`;
+
   const activityKey = activeBook === bookPages.science ? 'science' : activeBook === bookPages.inter1 ? 'inter1' : activeBook === bookPages.inter2 ? 'inter2' : 'maths';
-  const concept = pageConcepts[activityKey][pageInChapter - 1];
+  const concept = pageConcepts[activityKey]?.[pageInChapter - 1] || 'Core concept';
   let conceptHeading = document.getElementById('bookConcept');
-  if (!conceptHeading) { conceptHeading = document.createElement('h4'); conceptHeading.id = 'bookConcept'; document.getElementById('bookChapter').after(conceptHeading); }
+  if (!conceptHeading && bChapter) {
+    conceptHeading = document.createElement('h4');
+    conceptHeading.id = 'bookConcept';
+    bChapter.after(conceptHeading);
+  }
   const uniqueConcept = `${activeBook.chapters[chapterIndex]} · ${concept}`;
-  conceptHeading.textContent = `Page ${activeBookPage + 1} concept · ${uniqueConcept}`;
-  document.getElementById('bookText').textContent = `${activeBook.text[chapterIndex]} Focus for this page: ${uniqueConcept}. Learn this idea separately, then connect it to the next page.`;
-  document.getElementById('bookExample').textContent = `${activeBook.examples[chapterIndex]} Focus on ${uniqueConcept.toLowerCase()} in this example.`;
+  if (conceptHeading) conceptHeading.textContent = `Page ${activeBookPage + 1} concept · ${uniqueConcept}`;
+
+  const bText = document.getElementById('bookText');
+  const bExample = document.getElementById('bookExample');
+  const bFormula = document.getElementById('bookFormula');
+  const bProblem = document.getElementById('bookProblem');
+  const bConclusion = document.getElementById('bookConclusion');
+
+  if (bText) bText.textContent = `${activeBook.text[chapterIndex]} Focus for this page: ${uniqueConcept}. Learn this idea separately, then connect it to the next page.`;
+  if (bExample) bExample.textContent = `${activeBook.examples[chapterIndex]} Focus on ${uniqueConcept.toLowerCase()} in this example.`;
   const activity = chapterActivities[activityKey] || chapterActivities.maths;
-  document.getElementById('bookFormula').textContent = (chapterFormulas[activityKey] || chapterFormulas.maths)[chapterIndex] || 'Use definitions, show each step, and check your answer.';
-  document.getElementById('bookProblem').textContent = `${activity[0]} Focus task: explain ${uniqueConcept.toLowerCase()} in one sentence before solving.`;
-  document.getElementById('bookConclusion').textContent = `${activity[2]} Page ${activeBookPage + 1} is complete: connect ${uniqueConcept.toLowerCase()} to the chapter idea.`;
-  document.getElementById('bookProgress').style.width = `${((activeBookPage + 1) / 100) * 100}%`;
-  document.getElementById('bookPrevious').disabled = activeBookPage === 0;
-  document.getElementById('bookChapterCount').textContent = `${activeBook.chapters.length} CHAPTERS`;
-  document.getElementById('bookChapterList').innerHTML = activeBook.chapters.map((chapter, index) => `<span class="${index === chapterIndex ? 'current' : ''}">${index + 1}</span>`).join('');
-  document.getElementById('bookNext').innerHTML = activeBookPage === 99 ? 'Finish book <span>✓</span>' : 'Next page <span>→</span>';
+  if (bFormula) bFormula.textContent = (chapterFormulas[activityKey] || chapterFormulas.maths)[chapterIndex] || 'Use definitions, show each step, and check your answer.';
+  if (bProblem) bProblem.textContent = `${activity[chapterIndex % activity.length]?.[0] || 'Solve one practice problem.'} Focus task: explain ${uniqueConcept.toLowerCase()} in one sentence before solving.`;
+  if (bConclusion) bConclusion.textContent = `${activity[chapterIndex % activity.length]?.[2] || 'Chapter idea complete.'} Page ${activeBookPage + 1} is complete: connect ${uniqueConcept.toLowerCase()} to the chapter idea.`;
+
+  const bProg = document.getElementById('bookProgress');
+  const bPrev = document.getElementById('bookPrevious');
+  const bNext = document.getElementById('bookNext');
+  const bCount = document.getElementById('bookChapterCount');
+  const bList = document.getElementById('bookChapterList');
+
+  if (bProg) bProg.style.width = `${((activeBookPage + 1) / 100) * 100}%`;
+  if (bPrev) bPrev.disabled = activeBookPage === 0;
+  if (bCount) bCount.textContent = `${activeBook.chapters.length} CHAPTERS`;
+  if (bList) bList.innerHTML = activeBook.chapters.map((chapter, index) => `<span class="${index === chapterIndex ? 'current' : ''}">${index + 1}</span>`).join('');
+  if (bNext) bNext.innerHTML = activeBookPage === 99 ? 'Finish book <span>✓</span>' : 'Next page <span>→</span>';
 }
 
 function openBook(bookKey) {
-  activeBook = bookPages[bookKey];
+  activeBook = bookPages[bookKey] || bookPages.maths;
   activeBookPage = 0;
   renderBookPage();
-  bookReader.hidden = false;
-  bookReader.classList.add('open');
+  if (bookReader) {
+    bookReader.hidden = false;
+    bookReader.classList.add('open');
+    const readerEl = bookReader.querySelector('.book-reader');
+    if (readerEl) readerEl.scrollTop = 0;
+  }
 }
 
 document.querySelectorAll('[data-book]').forEach((button) => button.addEventListener('click', () => openBook(button.dataset.book)));
-document.getElementById('bookClose').addEventListener('click', () => { bookReader.classList.remove('open'); bookReader.hidden = true; });
-document.getElementById('bookPrevious').addEventListener('click', () => { if (activeBookPage > 0) { activeBookPage -= 1; renderBookPage(); } });
-document.getElementById('bookNext').addEventListener('click', () => {
-  if (activeBookPage < 99) { activeBookPage += 1; renderBookPage(); }
-  else { showToast('Book completed. Your reading progress is saved.'); }
-});
-document.getElementById('bookQuiz').addEventListener('click', () => openQuiz(`${activeBook.chapters[Math.floor(activeBookPage / 10)]} quiz`));
-bookReader.addEventListener('click', (event) => { if (event.target === bookReader) { bookReader.classList.remove('open'); bookReader.hidden = true; } });
+
+const bookCloseBtn = document.getElementById('bookClose');
+if (bookCloseBtn) bookCloseBtn.addEventListener('click', () => { if (bookReader) { bookReader.classList.remove('open'); bookReader.hidden = true; } });
+
+const bookPrevBtn = document.getElementById('bookPrevious');
+if (bookPrevBtn) bookPrevBtn.addEventListener('click', () => { if (activeBookPage > 0) { activeBookPage -= 1; renderBookPage(); } });
+
+const bookNextBtn = document.getElementById('bookNext');
+if (bookNextBtn) {
+  bookNextBtn.addEventListener('click', () => {
+    if (activeBookPage < 99) { activeBookPage += 1; renderBookPage(); }
+    else { showToast('Book completed. Your reading progress is saved.'); }
+  });
+}
+
+const bookQuizBtn = document.getElementById('bookQuiz');
+if (bookQuizBtn) bookQuizBtn.addEventListener('click', () => openQuiz(`${activeBook.chapters[Math.floor(activeBookPage / 10)]} quiz`));
+
+if (bookReader) {
+  bookReader.addEventListener('click', (event) => {
+    if (event.target === bookReader) {
+      bookReader.classList.remove('open');
+      bookReader.hidden = true;
+    }
+  });
+}
 
 const videoReader = document.getElementById('videoReader');
-document.querySelectorAll('[data-video]').forEach((button) => button.addEventListener('click', () => { videoReader.hidden = false; videoReader.classList.add('open'); }));
-document.getElementById('videoClose').addEventListener('click', () => { videoReader.classList.remove('open'); videoReader.hidden = true; });
-document.getElementById('videoQuiz').addEventListener('click', () => openQuiz('Fractions video quiz'));
-videoReader.addEventListener('click', (event) => { if (event.target === videoReader) { videoReader.classList.remove('open'); videoReader.hidden = true; } });
-document.getElementById('modalClose').addEventListener('click', () => modal.classList.remove('open'));
-modal.addEventListener('click', (event) => {
-  if (event.target === modal) modal.classList.remove('open');
+document.querySelectorAll('[data-video]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (videoReader) {
+      videoReader.hidden = false;
+      videoReader.classList.add('open');
+      const vEl = videoReader.querySelector('.video-reader');
+      if (vEl) vEl.scrollTop = 0;
+    }
+  });
 });
+
+const videoCloseBtn = document.getElementById('videoClose');
+if (videoCloseBtn) videoCloseBtn.addEventListener('click', () => { if (videoReader) { videoReader.classList.remove('open'); videoReader.hidden = true; } });
+
+const videoQuizBtn = document.getElementById('videoQuiz');
+if (videoQuizBtn) videoQuizBtn.addEventListener('click', () => openQuiz('Fractions video quiz'));
+
+if (videoReader) {
+  videoReader.addEventListener('click', (event) => {
+    if (event.target === videoReader) {
+      videoReader.classList.remove('open');
+      videoReader.hidden = true;
+    }
+  });
+}
+
+const modalCloseBtn = document.getElementById('modalClose');
+if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => { if (modal) modal.classList.remove('open'); });
+
+if (modal) {
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) modal.classList.remove('open');
+  });
+}
 
 document.querySelectorAll('.quiz-options button').forEach((button) => {
   button.addEventListener('click', () => {
     document.querySelectorAll('.quiz-options button').forEach((option) => { option.disabled = true; });
     if (button.dataset.answer === 'correct') {
       button.classList.add('correct-answer');
-      feedback.innerHTML = '<strong>Correct!</strong> 2/3 is 4/6, and 4/6 + 1/6 = 5/6. Great work.';
+      if (feedback) feedback.innerHTML = '<strong>Correct!</strong> 2/3 is 4/6, and 4/6 + 1/6 = 5/6. Great work.';
       showToast('Quiz complete: 10/10');
       recordProgress(1, 1, 2);
     } else {
       button.classList.add('wrong-answer');
-      document.querySelector('[data-answer="correct"]').classList.add('correct-answer');
-      feedback.innerHTML = '<strong>Let us learn together.</strong> The correct answer is B. Try the revision lesson and come back for another attempt.';
+      const correctOption = document.querySelector('[data-answer="correct"]');
+      if (correctOption) correctOption.classList.add('correct-answer');
+      if (feedback) feedback.innerHTML = '<strong>Let us learn together.</strong> The correct answer is B. Try the revision lesson and come back for another attempt.';
       recordProgress(1, 0, 2);
     }
   });
@@ -614,19 +802,26 @@ const pageTemplates = {
 
 function showPage(view) {
   document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.toggle('active', nav.dataset.view === view));
-  document.getElementById('pageTitle').textContent = view === 'Home' ? 'My learning space' : view;
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle) pageTitle.textContent = view === 'Home' ? 'My learning space' : view;
   const isHome = view === 'Home';
-  dashboardView.hidden = !isHome;
-  routedPage.hidden = isHome;
-  if (!isHome) {
-    if (view === 'Profile') routedPage.innerHTML = getProfileTemplate();
-    else routedPage.innerHTML = pageTemplates[view];
+  if (dashboardView) dashboardView.hidden = !isHome;
+  if (routedPage) {
+    routedPage.hidden = isHome;
+    if (!isHome) {
+      if (view === 'Profile') routedPage.innerHTML = getProfileTemplate();
+      else routedPage.innerHTML = pageTemplates[view] || '';
+    }
+    if (view === 'Learn') routedPage.innerHTML = buildLearningCatalog();
+    if (view === 'Quizzes') routedPage.innerHTML = buildQuizCatalog();
+    if (view === 'Tests') routedPage.innerHTML = buildTestsCatalog();
+    if (view === 'Progress') routedPage.innerHTML = buildProgressPage();
   }
-  if (view === 'Learn') routedPage.innerHTML = buildLearningCatalog();
-  if (view === 'Quizzes') routedPage.innerHTML = buildQuizCatalog();
-  if (view === 'Tests') routedPage.innerHTML = buildTestsCatalog();
-  if (view === 'Progress') routedPage.innerHTML = buildProgressPage();
-  document.getElementById('sidebar').classList.remove('open');
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.classList.remove('open');
+  const mainContent = document.querySelector('.main-content');
+  if (mainContent) mainContent.scrollTop = 0;
+  window.scrollTo(0, 0);
 }
 
 function buildTestsCatalog() {
@@ -695,16 +890,18 @@ let selectedChapter = 0;
 
 function buildLearningCatalog() {
   const gradeTabs = [6, 7, 8, 9, 10, 11, 12].map((grade) => `<button class="grade-tab ${grade === selectedGrade ? 'active' : ''}" data-grade="${grade}">${grade < 11 ? `Class ${grade}` : grade === 11 ? 'Inter 1st Year' : 'Inter 2nd Year'}</button>`).join('');
-  const cards = Object.entries(learningCatalog[selectedGrade]).map(([subject, topics], index) => {
-    const meta = subjectMeta[subject];
-    return `<article class="subject-learning-card"><div class="subject-card-top"><div class="route-subject ${meta.tone}">${meta.icon}</div><span class="difficulty ${index === 0 ? 'foundation' : 'basic'}">NOT STARTED</span></div><h2>${meta.label}</h2><p>${meta.description}</p><div class="catalog-topic"><b>${topics[0]}</b><span>0% complete</span></div><div class="progress-line"><span style="width:0%"></span></div><div class="subject-card-actions"><button class="outline-button page-action" data-action="topic" data-topic="${subject}">Explore subject <span>→</span></button><button class="soft-button page-action" data-action="subject-quiz" data-topic="${subject}">Start quiz</button></div><small>${topics.length} chapters · Theory, practice & quiz</small></article>`;
+  const currentCatalog = learningCatalog[selectedGrade] || learningCatalog[8];
+  const cards = Object.entries(currentCatalog).map(([subject, topics], index) => {
+    const meta = subjectMeta[subject] || { label: subject, icon: '◈', tone: 'math', description: 'Explore foundation topics.' };
+    return `<article class="subject-learning-card"><div class="subject-card-top"><div class="route-subject ${meta.tone}">${meta.icon}</div><span class="difficulty ${index === 0 ? 'foundation' : 'basic'}">NOT STARTED</span></div><h2>${meta.label}</h2><p>${meta.description}</p><div class="catalog-topic"><b>${topics[0] || 'Fundamentals'}</b><span>0% complete</span></div><div class="progress-line"><span style="width:0%"></span></div><div class="subject-card-actions"><button class="outline-button page-action" data-action="topic" data-topic="${subject}">Explore subject <span>→</span></button><button class="soft-button page-action" data-action="subject-quiz" data-topic="${subject}">Start quiz</button></div><small>${topics.length} chapters · Theory, practice & quiz</small></article>`;
   }).join('');
-  return `<div class="route-heading catalog-heading"><div><span class="overline">FOUNDATION LEARNING PATHS</span><h1>Learn at your pace</h1><p>Choose your class and build strong foundations in every subject.</p></div><div class="catalog-summary"><b>5</b><small>classes · 4 subjects</small></div></div><div class="grade-tabs">${gradeTabs}</div><div class="catalog-note"><span>✓</span> Content is matched to Class ${selectedGrade}. Harder levels unlock as your mastery grows.</div><div class="subject-learning-grid">${cards}</div>`;
+  return `<div class="route-heading catalog-heading"><div><span class="overline">FOUNDATION LEARNING PATHS</span><h1>Learn at your pace</h1><p>Choose your class and build strong foundations in every subject.</p></div><div class="catalog-summary"><b>${gradeLabel(selectedGrade)}</b><small>4 subjects</small></div></div><div class="grade-tabs">${gradeTabs}</div><div class="catalog-note"><span>✓</span> Content is matched to ${gradeLabel(selectedGrade)}. Harder levels unlock as your mastery grows.</div><div class="subject-learning-grid">${cards}</div>`;
 }
 
 function showTopicPage(topicKey = 'maths', chapterIndex = 0) {
-  const meta = subjectMeta[topicKey];
-  const topics = learningCatalog[selectedGrade][topicKey];
+  const meta = subjectMeta[topicKey] || subjectMeta.maths;
+  const currentCatalog = learningCatalog[selectedGrade] || learningCatalog[8];
+  const topics = currentCatalog[topicKey] || ['Foundation'];
   selectedChapter = chapterIndex;
   const title = topics[selectedChapter] || topics[0];
   const examples = {
@@ -712,96 +909,147 @@ function showTopicPage(topicKey = 'maths', chapterIndex = 0) {
     physics: ['A bicycle travels 120 metres in 20 seconds. What is its speed?', 'Speed = distance ÷ time = 120 ÷ 20 = 6 m/s.', 'Speed compares how much distance is covered in a given time.'],
     chemistry: ['Why does a lump of sugar disappear in water?', 'Sugar particles spread between water particles. The sugar has dissolved; it has not vanished.', 'Matter can change its form or mix while its particles remain present.'],
     reasoning: ['Find the next number: 3, 6, 12, 24, __', 'Each number is multiplied by 2. The next number is 48.', 'Look for the simplest rule that connects every pair in the sequence.']
-  }[topicKey];
+  }[topicKey] || ['What is the core idea?', 'Solve step by step.', 'Understand the principle.'];
+
   document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.toggle('active', nav.dataset.view === 'Learn'));
-  document.getElementById('pageTitle').textContent = title;
-  dashboardView.hidden = true;
-  routedPage.hidden = false;
-  routedPage.innerHTML = `<div class="topic-header"><button class="back-link" id="backToLearn">← Back to all subjects</button><div class="topic-heading"><div><span class="overline coral-text">CLASS ${selectedGrade} · ${meta.label.toUpperCase()} · FOUNDATION PATH</span><h1>${title}</h1><p>${meta.description} Learn the idea, solve carefully, then test your thinking.</p></div><div class="topic-mastery"><div class="ring" style="--progress:72"><span>72%</span></div><div><b>Topic mastery</b><small>Keep practising</small></div></div></div></div><div class="learning-cycle"><span class="cycle-done">✓ Learn</span><span class="cycle-done">✓ Understand</span><span class="cycle-current">3 Solve</span><span>4 Test</span><span>5 Analyze</span><span>6 Revise</span></div><div class="topic-layout"><main><section class="topic-section"><div class="section-kicker">01 · LEARN</div><h2>What is ${title}?</h2><p>${meta.description} In this chapter, we begin with the idea in simple language, connect it to everyday examples, and build towards Class ${selectedGrade} foundation problems.</p><div class="concept-banner"><span class="concept-icon ${meta.tone}">${meta.icon}</span><div><b>Why do we need it?</b><small>These ideas help us explain real situations, make predictions and solve problems with confidence.</small></div></div><div class="topic-columns"><article><h3>Important points</h3><ul><li>Start by naming the concept clearly.</li><li>Draw or describe what is happening.</li><li>Check units, signs and assumptions.</li></ul></article><article class="formula-box"><h3>Rule box</h3><b>Think → Choose → Solve</b><strong>Explain every step</strong><small>Use a worked example before independent practice.</small></article></div><div class="mistake-box"><b>Common mistakes students make</b><p>Jumping to a formula without identifying the concept, skipping units, and changing an answer without checking the original question.</p></div></section><section class="topic-section"><div class="section-kicker">02 · UNDERSTAND</div><h2>Solved example</h2><div class="solved-problem"><div><span class="difficulty foundation">LEVEL 2 · FOUNDATION</span><h3>${examples[0]}</h3></div><div class="solution-steps"><p><b>Given:</b> The information in the question.</p><p><b>Concept used:</b> ${title}</p><p><b>Step 1:</b> Identify the quantities or pattern.</p><p><b>Step 2:</b> Apply the correct rule carefully.</p><p><b>Final answer:</b> <strong>${examples[1]}</strong></p></div><div class="why-box"><b>Why this method works</b><span>${examples[2]}</span></div></div></section><section class="topic-section practice-section"><div class="section-kicker">03 · SOLVE</div><div class="practice-title"><div><h2>Practice ladder</h2><p>Questions become harder as your performance improves.</p></div><span class="practice-score">1 / 5 solved</span></div><div class="difficulty-ladder"><button class="level active"><b>1</b><span>Basic</span></button><button class="level"><b>2</b><span>Foundation</span></button><button class="level"><b>3</b><span>Application</span></button><button class="level locked"><b>4</b><span>IIT Foundation</span></button><button class="level locked"><b>5</b><span>Challenge</span></button></div><div class="practice-question"><span class="difficulty basic">LEVEL 1 · BASIC</span><h3>Which statement best describes ${title}?</h3><div class="practice-options"><button data-practice-answer="wrong">A. It is only used in exams.</button><button data-practice-answer="correct">B. It helps us understand and solve related problems.</button><button data-practice-answer="wrong">C. It has no connection to daily life.</button><button data-practice-answer="wrong">D. It can be solved without thinking.</button></div><div class="hint-row"><button id="hintButton">▢ Show Hint 1</button><span id="hintText"></span></div><div class="practice-feedback" id="practiceFeedback"></div></div></section></main><aside class="topic-sidebar"><section class="topic-section"><div class="section-kicker">04 · TEST</div><h2>${meta.label} quiz</h2><p>10 questions · 8 minutes · Class ${selectedGrade}</p><button class="primary-button topic-action" data-action="quiz">Start quiz <span>→</span></button></section><section class="topic-section analysis-card"><div class="section-kicker">05 · ANALYZE</div><h2>Your learning signals</h2><div class="signal"><span>Theory progress</span><b>82%</b><div class="progress-line"><span style="width:82%"></span></div></div><div class="signal"><span>Quiz accuracy</span><b>68%</b><div class="progress-line"><span style="width:68%"></span></div></div><div class="signal"><span>Difficulty</span><b>Level 2</b><div class="progress-line"><span style="width:55%"></span></div></div><div class="recommendation-mini"><b>Recommended next step</b><p>Revise this concept, then attempt Practice Set 2.</p></div></section><section class="topic-section revision-card"><div class="section-kicker">06 · REVISE</div><h2>Revision summary</h2><p>Review definitions, rules and the solved example before moving to a harder level.</p><button class="soft-button topic-action" data-action="revision">Open revision <span>→</span></button></section></aside></div>`;
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle) pageTitle.textContent = title;
+  if (dashboardView) dashboardView.hidden = true;
+  if (routedPage) {
+    routedPage.hidden = false;
+    routedPage.innerHTML = `<div class="topic-header"><button class="back-link" id="backToLearn">← Back to all subjects</button><div class="topic-heading"><div><span class="overline coral-text">${gradeLabel(selectedGrade).toUpperCase()} · ${meta.label.toUpperCase()} · FOUNDATION PATH</span><h1>${title}</h1><p>${meta.description} Learn the idea, solve carefully, then test your thinking.</p></div><div class="topic-mastery"><div class="ring" style="--progress:72"><span>72%</span></div><div><b>Topic mastery</b><small>Keep practising</small></div></div></div></div><div class="learning-cycle"><span class="cycle-done">✓ Learn</span><span class="cycle-done">✓ Understand</span><span class="cycle-current">3 Solve</span><span>4 Test</span><span>5 Analyze</span><span>6 Revise</span></div><div class="topic-layout"><main><section class="topic-section"><div class="section-kicker">01 · LEARN</div><h2>What is ${title}?</h2><p>${meta.description} In this chapter, we begin with the idea in simple language, connect it to everyday examples, and build towards ${gradeLabel(selectedGrade)} foundation problems.</p><div class="concept-banner"><span class="concept-icon ${meta.tone}">${meta.icon}</span><div><b>Why do we need it?</b><small>These ideas help us explain real situations, make predictions and solve problems with confidence.</small></div></div><div class="topic-columns"><article><h3>Important points</h3><ul><li>Start by naming the concept clearly.</li><li>Draw or describe what is happening.</li><li>Check units, signs and assumptions.</li></ul></article><article class="formula-box"><h3>Rule box</h3><b>Think → Choose → Solve</b><strong>Explain every step</strong><small>Use a worked example before independent practice.</small></article></div><div class="mistake-box"><b>Common mistakes students make</b><p>Jumping to a formula without identifying the concept, skipping units, and changing an answer without checking the original question.</p></div></section><section class="topic-section"><div class="section-kicker">02 · UNDERSTAND</div><h2>Solved example</h2><div class="solved-problem"><div><span class="difficulty foundation">LEVEL 2 · FOUNDATION</span><h3>${examples[0]}</h3></div><div class="solution-steps"><p><b>Given:</b> The information in the question.</p><p><b>Concept used:</b> ${title}</p><p><b>Step 1:</b> Identify the quantities or pattern.</p><p><b>Step 2:</b> Apply the correct rule carefully.</p><p><b>Final answer:</b> <strong>${examples[1]}</strong></p></div><div class="why-box"><b>Why this method works</b><span>${examples[2]}</span></div></div></section><section class="topic-section practice-section"><div class="section-kicker">03 · SOLVE</div><div class="practice-title"><div><h2>Practice ladder</h2><p>Questions become harder as your performance improves.</p></div><span class="practice-score">1 / 5 solved</span></div><div class="difficulty-ladder"><button class="level active"><b>1</b><span>Basic</span></button><button class="level"><b>2</b><span>Foundation</span></button><button class="level"><b>3</b><span>Application</span></button><button class="level locked"><b>4</b><span>IIT Foundation</span></button><button class="level locked"><b>5</b><span>Challenge</span></button></div><div class="practice-question"><span class="difficulty basic">LEVEL 1 · BASIC</span><h3>Which statement best describes ${title}?</h3><div class="practice-options"><button data-practice-answer="wrong">A. It is only used in exams.</button><button data-practice-answer="correct">B. It helps us understand and solve related problems.</button><button data-practice-answer="wrong">C. It has no connection to daily life.</button><button data-practice-answer="wrong">D. It can be solved without thinking.</button></div><div class="hint-row"><button id="hintButton">▢ Show Hint 1</button><span id="hintText"></span></div><div class="practice-feedback" id="practiceFeedback"></div></div></section></main><aside class="topic-sidebar"><section class="topic-section"><div class="section-kicker">04 · TEST</div><h2>${meta.label} quiz</h2><p>10 questions · 8 minutes · ${gradeLabel(selectedGrade)}</p><button class="primary-button topic-action" data-action="quiz">Start quiz <span>→</span></button></section><section class="topic-section analysis-card"><div class="section-kicker">05 · ANALYZE</div><h2>Your learning signals</h2><div class="signal"><span>Theory progress</span><b>82%</b><div class="progress-line"><span style="width:82%"></span></div></div><div class="signal"><span>Quiz accuracy</span><b>68%</b><div class="progress-line"><span style="width:68%"></span></div></div><div class="signal"><span>Difficulty</span><b>Level 2</b><div class="progress-line"><span style="width:55%"></span></div></div><div class="recommendation-mini"><b>Recommended next step</b><p>Revise this concept, then attempt Practice Set 2.</p></div></section><section class="topic-section revision-card"><div class="section-kicker">06 · REVISE</div><h2>Revision summary</h2><p>Review definitions, rules and the solved example before moving to a harder level.</p><button class="soft-button topic-action" data-action="revision">Open revision <span>→</span></button></section></aside></div>`;
+  }
+  const mainContent = document.querySelector('.main-content');
+  if (mainContent) mainContent.scrollTop = 0;
+  window.scrollTo(0, 0);
 }
 
 document.querySelectorAll('.nav-item').forEach((item) => item.addEventListener('click', () => showPage(item.dataset.view)));
 
-routedPage.addEventListener('click', (event) => {
-  const quizPageButton = event.target.closest('[data-quiz-page]');
-  if (quizPageButton) {
-    quizPage = Number(quizPageButton.dataset.quizPage);
-    routedPage.innerHTML = buildQuizCatalog();
-    return;
-  }
-  const topicQuiz = event.target.closest('.topic-action');
-  if (topicQuiz) { openTest(`${topicQuiz.closest('.topic-section').querySelector('h2').textContent} · Chapter quiz`, 10); return; }
-  const action = event.target.closest('.page-action')?.dataset.action;
-  if (action === 'topic') { const topic = event.target.closest('.page-action').dataset.topic || 'maths'; showTopicPage(topic); resetOpenedTopicProgress(); addChapterNavigator(topic); return; }
-  if (action === 'subject-quiz') { const subject = event.target.closest('.page-action').dataset.topic || 'maths'; openQuiz(`${subjectMeta[subject].label} quiz`, subject); return; }
-  if (action === 'quiz') { const topicQuiz = event.target.closest('.topic-action'); if (topicQuiz) openTest(`${topicQuiz.closest('.topic-section').querySelector('h2').textContent} · Chapter quiz`, 10); else openQuiz(); }
-  if (action === 'quiz' && event.target.closest('[data-quiz-id]')) { const question = quizQuestionBank[Number(event.target.closest('[data-quiz-id]').dataset.quizId) - 1]; openQuiz(`Quiz Question ${question.number}`, question.subject, question); }
-  if (action === 'continue' || action === 'lesson') showToast('Lesson opened: Fractions and Decimals.');
-  if (action === 'practice') openTest('Daily 15 · IIT Foundation Practice', 15, dailyPracticeQuestions);
-  if (action === 'test') openTest(event.target.closest('.page-action').dataset.test || 'Your test');
-  if (action === 'report') downloadReport();
-  if (action === 'save') showToast('Profile details saved.');
-  if (action === 'signout') {
-    clearAuthSession();
-    showToast('Signed out.');
-    authScreen.classList.remove('hidden');
-    showPage('Home');
-  }
-  if (action === 'revision') showToast('Revision lesson opened: equivalent fractions.');
-});
-
-routedPage.addEventListener('click', (event) => {
-  const levelChoice = event.target.closest('.level');
-  if (levelChoice) {
-    document.querySelectorAll('.level').forEach((level) => level.classList.remove('active'));
-    levelChoice.classList.add('active');
-    levelChoice.classList.remove('locked');
-    const levelNumber = levelChoice.dataset.level || levelChoice.querySelector('b')?.textContent || '1';
-    const levelNames = { 1: 'BASIC', 2: 'FOUNDATION', 3: 'APPLICATION', 4: 'IIT FOUNDATION', 5: 'CHALLENGE', 6: 'JEE MAIN', 7: 'JEE ADVANCED' };
-    const difficulty = document.querySelector('.practice-question .difficulty');
-    const question = document.querySelector('.practice-question h3');
-    const feedback = document.getElementById('practiceFeedback');
-    if (difficulty) difficulty.textContent = `LEVEL ${levelNumber} · ${levelNames[levelNumber]}`;
-    if (question) question.textContent = `Level ${levelNumber} practice: apply this chapter's idea carefully.`;
-    if (feedback) feedback.textContent = `Level ${levelNumber} is ready. Try the question below.`;
-    return;
-  }
-  const chapterChoice = event.target.closest('[data-chapter]');
-  const prepMode = event.target.closest('[data-prep]');
-  if (prepMode) { routedPage.querySelectorAll('.prep-mode').forEach((mode) => mode.classList.remove('active')); prepMode.classList.add('active'); showToast(`${prepMode.textContent} practice selected.`); return; }
-  if (chapterChoice) { const topic = chapterChoice.dataset.topic; showTopicPage(topic, Number(chapterChoice.dataset.chapter)); resetOpenedTopicProgress(); addChapterNavigator(topic); return; }
-  const gradeTab = event.target.closest('[data-grade]');
-  if (gradeTab) {
-    selectedGrade = Number(gradeTab.dataset.grade);
-    routedPage.innerHTML = buildLearningCatalog();
-    return;
-  }
-  if (event.target.id === 'backToLearn') showPage('Learn');
-  if (event.target.id === 'hintButton') {
-    document.getElementById('hintText').textContent = 'Hint 1: Look for a fraction with the same value as one-half.';
-    event.target.textContent = '✓ Hint 1 shown';
-  }
-  const practiceAnswer = event.target.closest('[data-practice-answer]');
-  if (practiceAnswer) {
-    document.querySelectorAll('[data-practice-answer]').forEach((option) => { option.disabled = true; });
-    const result = document.getElementById('practiceFeedback');
-    if (practiceAnswer.dataset.practiceAnswer === 'correct') {
-      practiceAnswer.classList.add('practice-correct');
-      result.innerHTML = '<strong>Correct.</strong> 3/6 simplifies to 1/2. Level 2 Foundation is now unlocked.';
-      recordProgress(1, 1, 2);
-    } else {
-      practiceAnswer.classList.add('practice-wrong');
-      document.querySelector('[data-practice-answer="correct"]').classList.add('practice-correct');
-      result.innerHTML = '<strong>Let us learn together.</strong> Divide the numerator and denominator of 3/6 by 3.';
-      recordProgress(1, 0, 2);
+if (routedPage) {
+  routedPage.addEventListener('click', (event) => {
+    const quizPageButton = event.target.closest('[data-quiz-page]');
+    if (quizPageButton) {
+      quizPage = Number(quizPageButton.dataset.quizPage);
+      routedPage.innerHTML = buildQuizCatalog();
+      return;
     }
-  }
-});
+    const topicQuiz = event.target.closest('.topic-action');
+    if (topicQuiz) {
+      const heading = topicQuiz.closest('.topic-section')?.querySelector('h2');
+      openTest(`${heading ? heading.textContent : 'Chapter'} · Chapter quiz`, 10);
+      return;
+    }
+    const action = event.target.closest('.page-action')?.dataset.action;
+    if (action === 'topic') {
+      const topic = event.target.closest('.page-action').dataset.topic || 'maths';
+      showTopicPage(topic);
+      resetOpenedTopicProgress();
+      addChapterNavigator(topic);
+      return;
+    }
+    if (action === 'subject-quiz') {
+      const subject = event.target.closest('.page-action').dataset.topic || 'maths';
+      openQuiz(`${subjectMeta[subject]?.label || 'Subject'} quiz`, subject);
+      return;
+    }
+    if (action === 'quiz') {
+      const tQuiz = event.target.closest('.topic-action');
+      if (tQuiz) {
+        const h2 = tQuiz.closest('.topic-section')?.querySelector('h2');
+        openTest(`${h2 ? h2.textContent : 'Quiz'} · Chapter quiz`, 10);
+      } else {
+        openQuiz();
+      }
+      return;
+    }
+    if (action === 'quiz' && event.target.closest('[data-quiz-id]')) {
+      const qId = Number(event.target.closest('[data-quiz-id]').dataset.quizId) - 1;
+      const question = quizQuestionBank[qId] || quizQuestionBank[0];
+      openQuiz(`Quiz Question ${question.number}`, question.subject, question);
+      return;
+    }
+    if (action === 'continue' || action === 'lesson') showToast('Lesson opened: Fractions and Decimals.');
+    if (action === 'practice') openTest('Daily 15 · IIT Foundation Practice', 15, dailyPracticeQuestions);
+    if (action === 'test') openTest(event.target.closest('.page-action').dataset.test || 'Your test');
+    if (action === 'report') downloadReport();
+    if (action === 'save') showToast('Profile details saved.');
+    if (action === 'signout') {
+      clearAuthSession();
+      showToast('Signed out successfully.');
+      if (authScreen) authScreen.classList.remove('hidden');
+      showPage('Home');
+    }
+    if (action === 'revision') showToast('Revision lesson opened: equivalent fractions.');
+  });
+
+  routedPage.addEventListener('click', (event) => {
+    const levelChoice = event.target.closest('.level');
+    if (levelChoice) {
+      document.querySelectorAll('.level').forEach((level) => level.classList.remove('active'));
+      levelChoice.classList.add('active');
+      levelChoice.classList.remove('locked');
+      const levelNumber = levelChoice.dataset.level || levelChoice.querySelector('b')?.textContent || '1';
+      const levelNames = { 1: 'BASIC', 2: 'FOUNDATION', 3: 'APPLICATION', 4: 'IIT FOUNDATION', 5: 'CHALLENGE', 6: 'JEE MAIN', 7: 'JEE ADVANCED' };
+      const difficulty = document.querySelector('.practice-question .difficulty');
+      const question = document.querySelector('.practice-question h3');
+      const practiceFb = document.getElementById('practiceFeedback');
+      if (difficulty) difficulty.textContent = `LEVEL ${levelNumber} · ${levelNames[levelNumber] || 'PRACTICE'}`;
+      if (question) question.textContent = `Level ${levelNumber} practice: apply this chapter's idea carefully.`;
+      if (practiceFb) practiceFb.textContent = `Level ${levelNumber} is ready. Try the question below.`;
+      return;
+    }
+    const chapterChoice = event.target.closest('[data-chapter]');
+    const prepMode = event.target.closest('[data-prep]');
+    if (prepMode) {
+      routedPage.querySelectorAll('.prep-mode').forEach((mode) => mode.classList.remove('active'));
+      prepMode.classList.add('active');
+      showToast(`${prepMode.textContent} practice selected.`);
+      return;
+    }
+    if (chapterChoice) {
+      const topic = chapterChoice.dataset.topic;
+      showTopicPage(topic, Number(chapterChoice.dataset.chapter));
+      resetOpenedTopicProgress();
+      addChapterNavigator(topic);
+      return;
+    }
+    const gradeTab = event.target.closest('[data-grade]');
+    if (gradeTab) {
+      selectedGrade = Number(gradeTab.dataset.grade);
+      routedPage.innerHTML = buildLearningCatalog();
+      return;
+    }
+    if (event.target.id === 'backToLearn') showPage('Learn');
+    if (event.target.id === 'hintButton') {
+      const hintEl = document.getElementById('hintText');
+      if (hintEl) hintEl.textContent = 'Hint 1: Look for a fraction with the same value as one-half.';
+      event.target.textContent = '✓ Hint 1 shown';
+    }
+    const practiceAnswer = event.target.closest('[data-practice-answer]');
+    if (practiceAnswer) {
+      document.querySelectorAll('[data-practice-answer]').forEach((option) => { option.disabled = true; });
+      const result = document.getElementById('practiceFeedback');
+      if (practiceAnswer.dataset.practiceAnswer === 'correct') {
+        practiceAnswer.classList.add('practice-correct');
+        if (result) result.innerHTML = '<strong>Correct.</strong> 3/6 simplifies to 1/2. Level 2 Foundation is now unlocked.';
+        recordProgress(1, 1, 2);
+      } else {
+        practiceAnswer.classList.add('practice-wrong');
+        const correctAns = document.querySelector('[data-practice-answer="correct"]');
+        if (correctAns) correctAns.classList.add('practice-correct');
+        if (result) result.innerHTML = '<strong>Let us learn together.</strong> Divide the numerator and denominator of 3/6 by 3.';
+        recordProgress(1, 0, 2);
+      }
+    }
+  });
+}
 
 document.querySelectorAll('[data-view-link]').forEach((link) => {
   link.addEventListener('click', () => {
     const target = link.dataset.viewLink;
-    document.querySelector(`[data-view="${target}"]`).click();
+    const targetNav = document.querySelector(`[data-view="${target}"]`);
+    if (targetNav) targetNav.click();
   });
 });
 
@@ -816,8 +1064,18 @@ document.querySelectorAll('.subject-tab').forEach((tab) => {
   });
 });
 
-document.getElementById('mobileMenu').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
-document.getElementById('languageToggle').addEventListener('click', (event) => {
-  event.target.textContent = event.target.textContent === 'EN' ? 'తె' : 'EN';
-  showToast(event.target.textContent === 'తె' ? 'Telugu labels enabled for your next lesson.' : 'English labels enabled.');
-});
+const mobileMenuBtn = document.getElementById('mobileMenu');
+if (mobileMenuBtn) {
+  mobileMenuBtn.addEventListener('click', () => {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.toggle('open');
+  });
+}
+
+const langToggleBtn = document.getElementById('languageToggle');
+if (langToggleBtn) {
+  langToggleBtn.addEventListener('click', (event) => {
+    event.target.textContent = event.target.textContent === 'EN' ? 'తె' : 'EN';
+    showToast(event.target.textContent === 'తె' ? 'Telugu labels enabled for your next lesson.' : 'English labels enabled.');
+  });
+}
