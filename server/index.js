@@ -159,6 +159,15 @@ app.get('/api/health', async (_req, res) => {
   res.json({ ok: true, service: 'balavidya-api', database: 'in_memory_mode', time: new Date().toISOString() });
 });
 
+// Auth Method Information
+app.get('/api/v1/auth/login', (_req, res) => {
+  res.json({ ok: true, message: 'Authentication endpoint ready. Please POST JSON with username and password.' });
+});
+
+app.get('/api/v1/auth/signup', (_req, res) => {
+  res.json({ ok: true, message: 'Registration endpoint ready. Please POST JSON to create a student account.' });
+});
+
 // Login
 app.post('/api/v1/auth/login', async (req, res, next) => {
   try {
